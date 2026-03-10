@@ -1,0 +1,416 @@
+const router = require("express").Router();
+const bcrypt = require("bcryptjs");
+const prisma = require("../config/database");
+const { auth, roleCheck } = require("../middleware/auth");
+router.use(auth, roleCheck("AGENT"));
+const multer = require("multer");
+const storage = multer.diskStorage({
+  destination: "uploads/settlements",
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
+const upload = multer({ storage });
+
+// Update the route to use upload middleware
+
+router.get("/dashboard", async (req, res) => {
+  try {
+    const agentId = req.user.agentId;
+    const { startDate, endDate } = req.query;
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate + "T23:59:59.999Z");
+    const txWhere = {
+      agentId,
+      ...(startDate || endDate ? { createdAt: dateFilter } : {}),
+    };
+
+    const [
+      commAgg,
+      payOutAgg,
+      payOutCount,
+      pendingCount,
+      pendingAmt,
+      clearedAmt,
+    ] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: "CLEARED" },
+        _sum: { agentCommission: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: "CLEARED" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.count({ where: { ...txWhere, status: "CLEARED" } }),
+      prisma.transaction.count({
+        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { agentId, status: "CLEARED" },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Available limit = SUM of assigned merchants' (maxPaymentLimit - usedLimit)
+    const assigned = await prisma.merchantAgent.findMany({
+      where: { agentId },
+      include: {
+        merchant: {
+          select: { maxPaymentLimit: true, usedLimit: true, isActive: true },
+        },
+      },
+    });
+    // Available Details = sum of all PENDING transactions for assigned merchants
+    const assignedMerchantIds = assigned
+      .map((ma) => ma.merchant)
+      .filter((m) => m.isActive)
+      .map((_, i) => assigned[i].merchantId);
+    const pendingAvailable = await prisma.transaction.aggregate({
+      where: { status: "PENDING", merchantId: { in: assignedMerchantIds } },
+      _sum: { amount: true },
+    });
+    const availableLimit = parseFloat(pendingAvailable._sum.amount || 0);
+    // Calculate Pay Out in AED and USDT
+    const rateConfig = await prisma.rateConfig.findFirst({
+      where: { OR: [{ agentId: req.user.agentId }, { merchantId: { in: assigned.map(a => a.merchantId) } }], isActive: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    const payOutAmount = parseFloat(payOutAgg._sum.amount || 0);
+    const aedRate = parseFloat(rateConfig?.aedTodayRate || 0);
+    const usdtRate = parseFloat(rateConfig?.usdtTodayRate || 0);
+    
+    const totalPaymentLunga = payOutAmount - (commAgg._sum.agentCommission || 0);
+    const payOutInAed = aedRate > 0 ? totalPaymentLunga / aedRate : 0;
+    const payOutInUsdt = usdtRate > 0 ? totalPaymentLunga / usdtRate : 0;
+    
+    res.json({
+      success: true,
+      data: {
+      totalAgentCommission: commAgg._sum.agentCommission || 0,
+      totalPayOutAmount: payOutAmount,
+      totalPayOutTransactions: payOutCount,
+      totalPendingTransactions: pendingCount,
+      totalPendingAmount: pendingAmt._sum.amount || 0,
+      availableLimit,
+      totalPaymentLunga,
+      payOutInAed,
+      payOutInUsdt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══ Operators ═══
+router.get("/operators", async (req, res) => {
+  try {
+    const where = { agentId: req.user.agentId };
+    if (req.query.search)
+      where.name = { contains: req.query.search, mode: "insensitive" };
+    res.json({
+      success: true,
+      data: await prisma.operator.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      }),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.post("/operators", async (req, res) => {
+  try {
+    const {
+      name,
+      maxTransactionAmount,
+      minTransactionAmount,
+      commissionChargePercent,
+      description,
+    } = req.body;
+    if (
+      !name ||
+      !maxTransactionAmount ||
+      !minTransactionAmount ||
+      !commissionChargePercent
+    )
+      return res.status(400).json({ success: false, message: "Required." });
+    const op = await prisma.operator.create({
+      data: {
+        name,
+        maxTransactionAmount: parseFloat(maxTransactionAmount),
+        minTransactionAmount: parseFloat(minTransactionAmount),
+        commissionChargePercent: parseFloat(commissionChargePercent),
+        description,
+        agentId: req.user.agentId,
+      },
+    });
+    res.status(201).json({ success: true, data: op });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.put("/operators/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.operator.findFirst({
+      where: { id, agentId: req.user.agentId },
+    });
+    if (!existing)
+      return res.status(404).json({ success: false, message: "Not found." });
+    const {
+      name,
+      maxTransactionAmount,
+      minTransactionAmount,
+      commissionChargePercent,
+      description,
+      isActive,
+    } = req.body;
+    const data = {};
+    if (name) data.name = name;
+    if (maxTransactionAmount !== undefined)
+      data.maxTransactionAmount = parseFloat(maxTransactionAmount);
+    if (minTransactionAmount !== undefined)
+      data.minTransactionAmount = parseFloat(minTransactionAmount);
+    if (commissionChargePercent !== undefined)
+      data.commissionChargePercent = parseFloat(commissionChargePercent);
+    if (description !== undefined) data.description = description;
+    if (typeof isActive === "boolean") data.isActive = isActive;
+    await prisma.operator.update({ where: { id }, data });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.delete("/operators/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ex = await prisma.operator.findFirst({
+      where: { id, agentId: req.user.agentId },
+    });
+    if (!ex)
+      return res.status(404).json({ success: false, message: "Not found." });
+    await prisma.operator.update({ where: { id }, data: { isActive: false } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══ Operator Users ═══
+router.get("/operator-users", async (req, res) => {
+  try {
+    const where = { role: "OPERATOR", operator: { agentId: req.user.agentId } };
+    if (req.query.operatorId) where.operatorId = parseInt(req.query.operatorId);
+    res.json({
+      success: true,
+      data: await prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          plainPassword: true,
+          isActive: true,
+          createdAt: true,
+          operator: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.post("/operator-users", async (req, res) => {
+  try {
+    const { username, password, operatorId } = req.body;
+    if (!username || !password || !operatorId)
+      return res.status(400).json({ success: false, message: "Required." });
+    const exists = await prisma.user.findUnique({
+      where: { username: username.toLowerCase().trim() },
+    });
+    if (exists)
+      return res
+        .status(400)
+        .json({ success: false, message: "Username exists." });
+    const op = await prisma.operator.findFirst({
+      where: { id: parseInt(operatorId), agentId: req.user.agentId },
+    });
+    if (!op)
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid operator." });
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.create({
+      data: {
+        name: username,
+        username: username.toLowerCase().trim(),
+        password: hashed,
+        role: "OPERATOR",
+        operatorId: parseInt(operatorId),
+        createdBy: req.user.id,
+      },
+    });
+    res.status(201).json({
+      success: true,
+      credentials: { username: username.toLowerCase().trim(), password },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.put("/operator-users/:id", async (req, res) => {
+  try {
+    const { username, password, operatorId, isActive } = req.body;
+    const data = {};
+    if (username) {
+      data.username = username.toLowerCase().trim();
+      data.name = username;
+    }
+    if (password) data.password = await bcrypt.hash(password, 10);
+    if (operatorId) data.operatorId = parseInt(operatorId);
+    if (typeof isActive === "boolean") data.isActive = isActive;
+    await prisma.user.update({ where: { id: parseInt(req.params.id) }, data });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.delete("/operator-users/:id", async (req, res) => {
+  try {
+    await prisma.user.update({
+      where: { id: parseInt(req.params.id) },
+      data: { isActive: false },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══ Transactions ═══
+router.get("/transactions", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      operatorId,
+      startDate,
+      endDate,
+      search,
+      remark,
+    } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const where = { agentId: req.user.agentId };
+    if (status) where.status = status;
+    if (operatorId) where.operatorId = parseInt(operatorId);
+    if (remark) where.notes = { contains: remark, mode: "insensitive" };
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate + "T23:59:59.999Z");
+    }
+    if (search) {
+      where.OR = [
+        { utrNumber: { contains: search, mode: "insensitive" } },
+        { upiId: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    const [data, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: {
+          merchant: { select: { name: true, maxPaymentLimit: true } },
+          operator: {
+            select: {
+              name: true,
+              maxTransactionAmount: true,
+              minTransactionAmount: true,
+              transactionPicked: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: parseInt(limit),
+      }),
+      prisma.transaction.count({ where }),
+    ]);
+    res.json({ success: true, data, total });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══ Ledger ═══
+router.get("/ledger", async (req, res) => {
+  try {
+    // Agent ledger = all cleared transactions as ledger entries
+    const transactions = await prisma.transaction.findMany({
+      where: { agentId: req.user.agentId, status: "CLEARED" },
+      select: {
+        id: true,
+        amount: true,
+        agentCommission: true,
+        transactionClearTime: true,
+        merchant: { select: { name: true } },
+        operator: { select: { name: true } },
+      },
+      orderBy: { transactionClearTime: "desc" },
+    });
+    res.json({ success: true, data: transactions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══ Settlements ═══
+router.get("/settlements", async (req, res) => {
+  try {
+    const data = await prisma.settlement.findMany({
+      where: { agentId: req.user.agentId },
+      include: {
+        merchant: { select: { name: true } },
+        collector: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+router.post("/settlements", upload.single("image"), async (req, res) => {
+  try {
+    const { remark, merchantId } = req.body;
+
+    const settlement = await prisma.settlement.create({
+      data: {
+        amount: 0,
+        agent: { connect: { id: req.user.agentId } },
+        ...(merchantId ? { merchant: { connect: { id: parseInt(merchantId) } } } : {}),
+        remark: remark || null,
+        proofImage: req.file ? req.file.filename : null,
+      },
+    });
+
+    res.status(201).json({ success: true, data: settlement });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+module.exports = router;

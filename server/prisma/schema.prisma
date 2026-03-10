@@ -1,0 +1,580 @@
+// ============================================
+// INDU PAY - Complete Database Schema (CORRECTED)
+// Database: PostgreSQL
+// ORM: Prisma
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MERCHANT
+  SUB_MERCHANT
+  AGENT
+  OPERATOR
+  COLLECTOR
+  EXPENSE_MANAGER
+}
+
+enum TransactionType {
+  UPI
+  BANK_ACCOUNT
+}
+
+enum TransactionStatus {
+  PENDING
+  PICKED
+  PAID
+  CLEARED
+  REJECTED
+  EXPIRED
+}
+
+enum SettlementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ExpenseCategory {
+  HOUSE_RENT
+  CAR
+  DRIVER_SALARY
+  COOK_SALARY
+  STAFF_SALARY
+  MISC_EXPENSE
+  ADMIN_WITHDRAWAL
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// 1. USERS (All roles login through this)
+// ============================================
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  username      String    @unique
+  password      String
+  plainPassword String?
+  role          Role
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  adminId       Int?      @unique
+  admin         Admin?    @relation(fields: [adminId], references: [id])
+
+  merchantId    Int?      @unique
+  merchant      Merchant? @relation(fields: [merchantId], references: [id])
+
+  subMerchantId Int?      @unique
+  subMerchant   SubMerchant? @relation(fields: [subMerchantId], references: [id])
+
+  agentId       Int?      @unique
+  agent         Agent?    @relation(fields: [agentId], references: [id])
+
+  operatorId    Int?
+  operator      Operator? @relation(fields: [operatorId], references: [id])
+
+  collectorId   Int?      @unique
+  collector     Collector? @relation(fields: [collectorId], references: [id])
+
+  createdBy     Int?
+  createdByUser User?     @relation("UserCreator", fields: [createdBy], references: [id])
+  createdUsers  User[]    @relation("UserCreator")
+
+  // Login History relation
+  loginHistory  LoginHistory[]
+
+  // Expense Entry relation (for EXPENSE_MANAGER role)
+  expenseEntries ExpenseEntry[] @relation("ExpenseEntryCreator")
+
+  @@index([role])
+  @@index([username])
+  @@map("users")
+}
+
+// ============================================
+// 2. ADMIN
+// ============================================
+model Admin {
+  id            Int       @id @default(autoincrement())
+  name          String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User?
+  merchants     Merchant[]
+  agents        Agent[]
+  collectors    Collector[]
+  rateConfigs   RateConfig[]
+  cashEntries   CashEntry[]
+  blockedIfscs  BlockedIfsc[]
+
+  @@map("admins")
+}
+
+// ============================================
+// 3. MERCHANT
+// ============================================
+model Merchant {
+  id                      Int       @id @default(autoincrement())
+  name                    String
+  description             String?
+  maxPaymentLimit         Decimal   @db.Decimal(15, 2)
+  usedLimit               Decimal   @default(0) @db.Decimal(15, 2)
+  commissionChargePercent Decimal   @db.Decimal(5, 2)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  adminId                 Int
+  admin                   Admin     @relation(fields: [adminId], references: [id])
+
+  user                    User?
+  subMerchants            SubMerchant[]
+  transactions            Transaction[]
+  settlements             Settlement[]
+  collections             Collection[]
+  rateConfigs             RateConfig[]
+  assignedAgents          MerchantAgent[]
+  beneficiaryAccounts     MerchantBeneficiary[]
+
+  @@index([adminId])
+  @@map("merchants")
+}
+
+// ============================================
+// 4. MERCHANT-AGENT ASSIGNMENT
+// ============================================
+model MerchantAgent {
+  id          Int       @id @default(autoincrement())
+  merchantId  Int
+  agentId     Int
+  assignedAt  DateTime  @default(now())
+
+  merchant    Merchant  @relation(fields: [merchantId], references: [id])
+  agent       Agent     @relation(fields: [agentId], references: [id])
+
+  @@unique([merchantId, agentId])
+  @@map("merchant_agents")
+}
+
+// ============================================
+// 5. SUB-MERCHANT
+// ============================================
+model SubMerchant {
+  id            Int       @id @default(autoincrement())
+  name          String
+  description   String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  merchantId    Int
+  merchant      Merchant  @relation(fields: [merchantId], references: [id])
+
+  user          User?
+  transactions  Transaction[]
+  ledgerEntries Ledger[]
+
+  @@index([merchantId])
+  @@map("sub_merchants")
+}
+
+// ============================================
+// 6. AGENT
+// ============================================
+model Agent {
+  id                      Int       @id @default(autoincrement())
+  name                    String
+  description             String?
+  commissionChargePercent Decimal   @db.Decimal(5, 2)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  adminId                 Int
+  admin                   Admin     @relation(fields: [adminId], references: [id])
+
+  user                    User?
+  operators               Operator[]
+  assignedMerchants       MerchantAgent[]
+  transactions            Transaction[]
+  rateConfigs             RateConfig[]
+  settlements             Settlement[]
+
+  @@index([adminId])
+  @@map("agents")
+}
+
+// ============================================
+// 7. OPERATOR
+// ============================================
+model Operator {
+  id                      Int       @id @default(autoincrement())
+  name                    String
+  maxTransactionAmount    Decimal   @db.Decimal(15, 2)
+  minTransactionAmount    Decimal   @db.Decimal(15, 2)
+  commissionChargePercent Decimal   @db.Decimal(5, 2)
+  description             String?
+  transactionPicked       Int       @default(0)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  agentId                 Int
+  agent                   Agent     @relation(fields: [agentId], references: [id])
+
+  operatorUsers           User[]
+  transactions            Transaction[]
+
+  @@index([agentId])
+  @@map("operators")
+}
+
+// ============================================
+// 8. COLLECTOR
+// ============================================
+model Collector {
+  id            Int       @id @default(autoincrement())
+  name          String
+  description   String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  adminId       Int
+  admin         Admin     @relation(fields: [adminId], references: [id])
+
+  user          User?
+  settlements   Settlement[]
+  requests      Request[]
+  ledgerEntries Ledger[]
+
+  @@index([adminId])
+  @@map("collectors")
+}
+
+// ============================================
+// 9. TRANSACTIONS
+// ============================================
+model Transaction {
+  id                    Int               @id @default(autoincrement())
+  amount                Decimal           @db.Decimal(15, 2)
+  transactionType       TransactionType
+  status                TransactionStatus @default(PENDING)
+
+  upiId                 String?
+  bankName              String?
+  ifscCode              String?
+  accountNumber         String?
+  accountHolderName     String?
+
+  utrNumber             String?
+  proofImage            String?
+  notes                 String?
+  rejectReason          String?
+
+  operatorPickTime      DateTime?
+  transactionClearTime  DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  merchantCommission    Decimal?          @db.Decimal(15, 2)
+  agentCommission       Decimal?          @db.Decimal(15, 2)
+  operatorCommission    Decimal?          @db.Decimal(15, 2)
+  adminCommission       Decimal?          @db.Decimal(15, 2)
+
+  merchantId            Int
+  merchant              Merchant          @relation(fields: [merchantId], references: [id])
+
+  subMerchantId         Int?
+  subMerchant           SubMerchant?      @relation(fields: [subMerchantId], references: [id])
+
+  agentId               Int?
+  agent                 Agent?            @relation(fields: [agentId], references: [id])
+
+  operatorId            Int?
+  operator              Operator?         @relation(fields: [operatorId], references: [id])
+
+  @@index([status])
+  @@index([merchantId])
+  @@index([agentId])
+  @@index([operatorId])
+  @@index([createdAt])
+  @@index([transactionType])
+  @@map("transactions")
+}
+
+// ============================================
+// 10. RATE CONFIGURATION
+// ============================================
+model RateConfig {
+  id              Int       @id @default(autoincrement())
+  usdtTodayRate   Decimal   @db.Decimal(10, 4)
+  aedTodayRate    Decimal   @db.Decimal(10, 4)
+  currency        String    @default("AED")
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  merchantId      Int?
+  merchant        Merchant? @relation(fields: [merchantId], references: [id])
+
+  agentId         Int?
+  agent           Agent?    @relation(fields: [agentId], references: [id])
+
+  adminId         Int
+  admin           Admin     @relation(fields: [adminId], references: [id])
+
+  @@index([merchantId])
+  @@index([agentId])
+  @@map("rate_configs")
+}
+
+// ============================================
+// 11. SETTLEMENTS (collectorId now OPTIONAL for agent settlements)
+// ============================================
+model Settlement {
+  id              Int              @id @default(autoincrement())
+  amount          Decimal          @db.Decimal(15, 2)
+  remark          String?
+  status          SettlementStatus @default(PENDING)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  proofImage      String?
+
+  merchantId      Int?
+  merchant        Merchant?        @relation(fields: [merchantId], references: [id])
+
+  collectorId     Int?
+  collector       Collector?       @relation(fields: [collectorId], references: [id])
+
+  agentId         Int?
+  agent           Agent?           @relation(fields: [agentId], references: [id])
+
+  @@index([merchantId])
+  @@index([collectorId])
+  @@index([agentId])
+  @@index([status])
+  @@map("settlements")
+}
+
+// ============================================
+// 12. COLLECTIONS
+// ============================================
+model Collection {
+  id            Int              @id @default(autoincrement())
+  amount        Decimal          @db.Decimal(15, 2)
+  description   String?
+  status        SettlementStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  merchantId    Int
+  merchant      Merchant         @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@map("collections")
+}
+
+// ============================================
+// 13. REQUESTS (Collector requests)
+// ============================================
+model Request {
+  id            Int           @id @default(autoincrement())
+  amount        Decimal       @db.Decimal(15, 2)
+  description   String?
+  status        RequestStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  collectorId   Int
+  collector     Collector     @relation(fields: [collectorId], references: [id])
+
+  @@index([collectorId])
+  @@map("requests")
+}
+
+// ============================================
+// 14. LEDGER
+// ============================================
+model Ledger {
+  id            Int       @id @default(autoincrement())
+  entryType     String
+  amount        Decimal   @db.Decimal(15, 2)
+  description   String?
+  balanceAfter  Decimal   @db.Decimal(15, 2)
+  createdAt     DateTime  @default(now())
+
+  subMerchantId Int?
+  subMerchant   SubMerchant? @relation(fields: [subMerchantId], references: [id])
+
+  collectorId   Int?
+  collector     Collector?   @relation(fields: [collectorId], references: [id])
+
+  transactionId Int?
+
+  @@index([subMerchantId])
+  @@index([collectorId])
+  @@index([createdAt])
+  @@map("ledger")
+}
+
+// ============================================
+// 15. CASH ENTRIES
+// ============================================
+model CashEntry {
+  id            Int       @id @default(autoincrement())
+  entryType     String
+  amount        Decimal   @db.Decimal(15, 2)
+  description   String?
+  createdAt     DateTime  @default(now())
+
+  adminId       Int
+  admin         Admin     @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@map("cash_entries")
+}
+
+// ============================================
+// 16. BLOCKED IFSC
+// ============================================
+model BlockedIfsc {
+  id            Int       @id @default(autoincrement())
+  ifscCode      String    @unique
+  reason        String?
+  createdAt     DateTime  @default(now())
+
+  adminId       Int
+  admin         Admin     @relation(fields: [adminId], references: [id])
+
+  @@map("blocked_ifscs")
+}
+
+// ============================================
+// 17. BENEFICIARY ACCOUNTS
+// ============================================
+model BeneficiaryAccount {
+  id                Int       @id @default(autoincrement())
+  accountNumber     String
+  ifscCode          String
+  accountHolderName String
+  bankName          String?
+  upiId             String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("beneficiary_accounts")
+}
+
+// ============================================
+// 18. MERCHANT BENEFICIARIES
+// ============================================
+model MerchantBeneficiary {
+  id                Int       @id @default(autoincrement())
+  accountNumber     String
+  ifscCode          String
+  accountHolderName String
+  bankName          String?
+  upiId             String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  merchantId        Int
+  merchant          Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@map("merchant_beneficiaries")
+}
+
+// ============================================
+// 19. TRANSFER REQUESTS
+// ============================================
+model TransferRequest {
+  id            Int           @id @default(autoincrement())
+  amount        Decimal       @db.Decimal(15, 2)
+  description   String?
+  status        RequestStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("transfer_requests")
+}
+
+// ============================================
+// 20. DAILY REPORTS
+// ============================================
+model DailyReport {
+  id              Int       @id @default(autoincrement())
+  reportDate      DateTime  @db.Date
+  role            Role
+  totalPayOut     Decimal   @db.Decimal(15, 2)
+  totalCommission Decimal   @db.Decimal(15, 2)
+  amountByCurrency String?
+  generatedAt     DateTime  @default(now())
+  userId          Int
+
+  @@unique([reportDate, userId])
+  @@map("daily_reports")
+}
+
+// ============================================
+// 21. LOGIN HISTORY
+// ============================================
+model LoginHistory {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  ipAddress   String
+  userAgent   String?
+  location    String?
+  loginAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([loginAt])
+  @@map("login_history")
+}
+
+// ============================================
+// 22. EXPENSE ENTRIES (Expense Manager role)
+// ============================================
+model ExpenseEntry {
+  id            Int       @id @default(autoincrement())
+  category      String
+  expenseDate   DateTime
+  description   String?
+  amount        Decimal   @db.Decimal(15, 2)
+  invoiceImage  String?
+  createdById   Int
+  createdByUser User      @relation("ExpenseEntryCreator", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([createdById])
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expense_entries")
+}

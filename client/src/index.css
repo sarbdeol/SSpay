@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Styles ─── */
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #fafafa;
+  color: #1c1c1e;
+}
+
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
+
+/* ─── Mac-like transitions ─── */
+@layer utilities {
+  .transition-mac {
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+}
+
+/* ─── Gradient cards ─── */
+.gradient-blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.gradient-teal { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.gradient-orange { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.gradient-purple { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.gradient-green { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.gradient-pink { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }

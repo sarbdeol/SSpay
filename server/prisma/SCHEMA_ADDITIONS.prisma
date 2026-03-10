@@ -1,0 +1,57 @@
+// ============================================
+// ADD THESE TO YOUR EXISTING schema.prisma
+// ============================================
+
+// 1. ADD 'PAID' to TransactionStatus enum (if not already):
+//    PENDING, PICKED, PAID, CLEARED, REJECTED, EXPIRED
+
+// 2. ADD 'EXPENSE_MANAGER' to Role enum:
+//    SUPER_ADMIN, ADMIN, MERCHANT, SUB_MERCHANT, AGENT, OPERATOR, COLLECTOR, EXPENSE_MANAGER
+
+// 3. ADD these fields to the Transaction model:
+//    rejectReason  String?   // Reason for rejection
+//    proofImage    String?   // Payment proof image filename
+
+// 4. ADD this new model for Login History:
+model LoginHistory {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  ipAddress   String
+  userAgent   String?
+  location    String?
+  loginAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([loginAt])
+  @@map("login_history")
+}
+
+// 5. ADD this new model for Expense Entries (Expense Manager role):
+model ExpenseEntry {
+  id            Int       @id @default(autoincrement())
+  category      String    // HOUSE_RENT, CAR, DRIVER_SALARY, COOK_SALARY, STAFF_SALARY, MISC, ADMIN_WITHDRAWAL
+  expenseDate   DateTime
+  description   String?
+  amount        Decimal   @db.Decimal(15, 2)
+  invoiceImage  String?   // Invoice photo filename
+  createdById   Int
+  createdByUser User      @relation("ExpenseEntryCreator", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([createdById])
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expense_entries")
+}
+
+// 6. ADD these relations to the User model:
+//    loginHistory    LoginHistory[]
+//    expenseEntries  ExpenseEntry[]  @relation("ExpenseEntryCreator")
+
+// ============================================
+// AFTER ADDING, RUN:
+// cd server
+// npx prisma migrate dev --name add-login-history-expense-manager-reject-reason
+// ============================================
