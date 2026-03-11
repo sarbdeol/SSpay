@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { HiOutlineViewGrid, HiOutlineDocumentReport, HiOutlineCog, HiOutlineLogout, HiOutlineUserGroup, HiOutlineCollection, HiOutlineCash, HiOutlineClipboardList, HiOutlineChevronDown, HiOutlineChevronRight, HiOutlineMenu, HiOutlineUsers, HiOutlineSwitchHorizontal, HiOutlineDocumentText, HiOutlineFolder, HiOutlineClock } from 'react-icons/hi';
-
+const ROLE_ROUTES = { SUPER_ADMIN: '/superadmin', ADMIN: '/admin', MERCHANT: '/merchant', SUB_MERCHANT: '/submerchant', AGENT: '/agent', OPERATOR: '/operator', COLLECTOR: '/collector', EXPENSE_MANAGER: '/expense-manager' };
 const MENUS = {
   SUPER_ADMIN: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/superadmin' },
@@ -118,14 +118,13 @@ function SidebarItem({ item, collapsed }) {
   }
   return <NavLink to={item.path} className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 text-sm rounded-xl transition-mac ${isActive ? 'bg-brand-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><Icon className="w-5 h-5 flex-shrink-0" />{!collapsed && <span>{item.label}</span>}</NavLink>;
 }
-
 export default function DashboardLayout({ children }) {
-  const { user, logout, stopImpersonating } = useAuth();
+  const { user, logout, stopImpersonating, impersonationStack, jumpToStack } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuItems = MENUS[user?.role] || [];
-  const isImp = !!localStorage.getItem('originalToken');
+
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className={`fixed lg:static inset-y-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
@@ -133,7 +132,12 @@ export default function DashboardLayout({ children }) {
         <div className="px-4 py-3 border-b border-gray-50"><p className="text-sm font-semibold text-gray-800 truncate">{user?.name}</p><p className="text-xs text-gray-400 truncate">{user?.role?.replace(/_/g, ' ')}</p></div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">{menuItems.map((item, i) => <SidebarItem key={i} item={item} collapsed={!sidebarOpen} />)}</nav>
         <div className="p-3 border-t border-gray-100">
-          {isImp && <button onClick={() => { stopImpersonating(); navigate('/'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 rounded-xl transition-mac mb-1"><HiOutlineSwitchHorizontal className="w-5 h-5" />{sidebarOpen && <span>Back to Original</span>}</button>}
+          {impersonationStack.length > 0 && (
+            <button onClick={() => { stopImpersonating(); navigate(ROLE_ROUTES[impersonationStack[impersonationStack.length - 1].user.role] || '/'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 rounded-xl transition-mac mb-1">
+              <HiOutlineSwitchHorizontal className="w-5 h-5" />
+              {sidebarOpen && <span>Back to {impersonationStack[impersonationStack.length - 1].user.name}</span>}
+            </button>
+          )}
           <button onClick={async () => { await logout(); navigate('/login'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-mac"><HiOutlineLogout className="w-5 h-5" />{sidebarOpen && <span>Logout</span>}</button>
         </div>
       </aside>
@@ -143,7 +147,21 @@ export default function DashboardLayout({ children }) {
           <button onClick={() => { if (window.innerWidth < 1024) setMobileOpen(!mobileOpen); else setSidebarOpen(!sidebarOpen); }} className="p-2 rounded-lg hover:bg-gray-100 transition-mac"><HiOutlineMenu className="w-5 h-5 text-gray-600" /></button>
           <div className="flex items-center gap-3"><CurrencyRatesDropdown /><div className="w-9 h-9 bg-brand-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">{user?.name?.charAt(0).toUpperCase()}</div></div>
         </header>
-        {isImp && <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700">⚠️ Viewing as <strong>{user?.name}</strong> ({user?.role?.replace(/_/g, ' ')})</div>}
+        {impersonationStack.length > 0 && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700 flex items-center gap-1 flex-wrap">
+            ⚠️
+            {impersonationStack.map((entry, i) => (
+              <React.Fragment key={i}>
+                <button onClick={() => { jumpToStack(i); navigate(ROLE_ROUTES[entry.user.role] || '/'); }} className="font-semibold hover:underline text-amber-800">
+                  {entry.user.name}
+                </button>
+                <span className="text-amber-400">›</span>
+              </React.Fragment>
+            ))}
+            <span className="font-semibold text-amber-900">{user?.name}</span>
+            <span className="text-amber-500 ml-1">({user?.role?.replace(/_/g, ' ')})</span>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>
