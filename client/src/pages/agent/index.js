@@ -233,7 +233,18 @@ export function AgentTransactions() {
         { header: 'Notes', render: r => r.notes || '-' },
         { header: 'Created', render: r => new Date(r.createdAt).toLocaleString() },
         { header: 'Cleared Date', render: r => r.transactionClearTime ? new Date(r.transactionClearTime).toLocaleString() : '-' },
-        { header: 'Status', render: r => <StatusBadge status={r.status} /> },
+        {
+  header: 'Status',
+  render: r => {
+    const labels = { PENDING: 'Pending', PICKED: 'Picked', SUBMITTED: 'Submitted', PAID: 'Paid', CONFIRMED: 'Confirmed', REJECTED: 'Rejected' };
+    const styles = { SUBMITTED: 'bg-emerald-100 text-emerald-700', PICKED: 'bg-blue-100 text-blue-700', REJECTED: 'bg-red-100 text-red-700', PAID: 'bg-purple-100 text-purple-700', CONFIRMED: 'bg-teal-100 text-teal-700' };
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[r.status] || 'bg-amber-100 text-amber-700'}`}>
+        {labels[r.status] || r.status}
+      </span>
+    );
+  }
+},
       ]} data={transactions} total={total} page={page} onPageChange={setPage}
         loading={loading} onExport={handleExport}
         actions={r => <button onClick={() => setShowDetail(r)} className="text-brand-500 text-sm">View All</button>}
@@ -295,85 +306,125 @@ export function AgentLedger() {
 // ═══ AGENT SETTLEMENTS (with USDT wallet) ═══
 export function AgentSettlements() {
   const [items, setItems] = useState([]);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ remark: '' });
-  const [image, setImage] = useState(null);
+  const [showSubmit, setShowSubmit] = useState(null);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [qrImage, setQrImage] = useState(null);
 
   const fetchData = () => api.get('/agent/settlements').then(r => setItems(r.data.data));
   useEffect(() => { fetchData(); }, []);
 
-  const handleCreate = async (e) => {
+  const handlePick = async (id) => {
+    try {
+      await api.post(`/agent/settlements/${id}/pick`);
+      toast.success('Picked!');
+      fetchData();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const formData = new FormData();
-      formData.append('remark', form.remark);
-      if (image) formData.append('image', image);
-
-      await api.post('/agent/settlements', formData, {
+      formData.append('walletAddress', walletAddress);
+      if (qrImage) formData.append('qrImage', qrImage);
+      await api.post(`/agent/settlements/${showSubmit.id}/submit`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      toast.success('Settlement created!');
-      setShowCreate(false);
-      setForm({ remark: '' });
-      setImage(null);
+      toast.success('Submitted!');
+      setShowSubmit(null);
+      setWalletAddress('');
+      setQrImage(null);
       fetchData();
-    } catch (e) {
-      toast.error('Error creating settlement.');
-    }
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+  const handleConfirm = async (id) => {
+    try {
+      await api.post(`/agent/settlements/${id}/confirm`);
+      toast.success('Confirmed! Payment received.');
+      fetchData();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+  const handleReject = async (id) => {
+    const reason = window.prompt('Enter reject reason:');
+    if (!reason) return;
+    try {
+      await api.post(`/agent/settlements/${id}/reject`, { reason });
+      toast.success('Rejected.');
+      fetchData();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
   };
 
   return (
     <div>
-      <PageHeader title="Settlements" action={<Button onClick={() => setShowCreate(true)}>Create Settlement</Button>} />
-
+      <PageHeader title="Settlements" />
       <DataTable
         columns={[
-          { header: 'Merchant', render: r => r.merchant?.name || '-' },
+          { header: 'Amount', render: r => `${r.currency || ''} ${parseFloat(r.amount).toLocaleString()}` },
+          { header: 'Collector', render: r => r.collector?.name || '-' },
           { header: 'Remark', render: r => r.remark || '-' },
+          { header: 'Wallet', render: r => r.walletAddress || '-' },
           {
-            header: 'Proof',
+            header: 'QR',
             render: r => r.proofImage ? (
-              <a
-                href={`/uploads/settlements/${r.proofImage}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-500 text-xs underline"
-              >
-                View
-              </a>
+              <a href={`/uploads/settlements/${r.proofImage}`} target="_blank" rel="noreferrer" className="text-blue-500 text-xs underline">View</a>
             ) : '-',
           },
-          { header: 'Status', render: r => <StatusBadge status={r.status} /> },
+          {
+  header: 'Status',
+  render: r => {
+    const labels = { PENDING: 'Pending', PICKED: 'Picked', SUBMITTED: 'Submitted', PAID: 'Paid', CONFIRMED: 'Confirmed', REJECTED: 'Rejected' };
+    const styles = { SUBMITTED: 'bg-emerald-100 text-emerald-700', PICKED: 'bg-blue-100 text-blue-700', REJECTED: 'bg-red-100 text-red-700', PAID: 'bg-purple-100 text-purple-700', CONFIRMED: 'bg-teal-100 text-teal-700' };
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[r.status] || 'bg-amber-100 text-amber-700'}`}>
+        {labels[r.status] || r.status}
+      </span>
+    );
+  }
+},
           { header: 'Date', render: r => new Date(r.createdAt).toLocaleString() },
         ]}
-        data={items}
-        total={items.length}
-        page={1}
+        data={items} total={items.length} page={1}
+        actions={r => (
+          <div className="flex gap-1">
+            {r.status === 'PENDING' && (
+              <Button onClick={() => handlePick(r.id)} variant="primary" className="h-7 px-2 text-xs">Pick</Button>
+            )}
+            {r.status === 'PICKED' && (
+              <>
+                <Button onClick={() => { setShowSubmit(r); setWalletAddress(''); setQrImage(null); }} variant="primary" className="h-7 px-2 text-xs">Submit</Button>
+                <Button onClick={() => handleReject(r.id)} variant="danger" className="h-7 px-2 text-xs">Reject</Button>
+              </>
+            )}
+            {r.status === 'PAID' && (
+              <Button onClick={() => handleConfirm(r.id)} variant="primary" className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700">Confirm Received</Button>
+            )}
+          </div>
+        )}
       />
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Settlement">
-        <form onSubmit={handleCreate}>
+      <Modal open={!!showSubmit} onClose={() => setShowSubmit(null)} title="Submit Settlement">
+        <form onSubmit={handleSubmit}>
+          <p className="text-sm text-gray-500 mb-3">
+            {showSubmit?.currency} {showSubmit && parseFloat(showSubmit.amount).toLocaleString()} — {showSubmit?.collector?.name || 'Collector'}
+          </p>
           <FormInput
-            label="Remark"
-            value={form.remark}
-            onChange={e => setForm({ ...form, remark: e.target.value })}
-            placeholder="Optional remark"
+            label="USDT Wallet Address"
+            required
+            value={walletAddress}
+            onChange={e => setWalletAddress(e.target.value)}
+            placeholder="Enter USDT wallet address"
           />
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Upload Image Proof
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Upload QR Image</label>
             <input
               type="file"
               accept="image/*"
-              onChange={e => setImage(e.target.files[0])}
+              onChange={e => setQrImage(e.target.files[0])}
               className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100"
             />
-            {image && (
-              <p className="text-xs text-gray-400 mt-1">Selected: {image.name}</p>
-            )}
+            {qrImage && <p className="text-xs text-gray-400 mt-1">Selected: {qrImage.name}</p>}
           </div>
-          <Button type="submit" className="w-full">Create Settlement</Button>
+          <Button type="submit" className="w-full">Submit</Button>
         </form>
       </Modal>
     </div>

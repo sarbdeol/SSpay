@@ -71,8 +71,18 @@ router.get('/transactions/:id', async (req, res) => {
 
 // ─── Settlements ───
 router.post('/settlements', async (req, res) => {
-  try { const { amount, collectorId, remark } = req.body; const s = await prisma.settlement.create({ data: { amount: parseFloat(amount), merchantId: req.user.merchantId, collectorId: parseInt(collectorId), remark } }); res.status(201).json({ success: true, data: s }); }
-  catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+  try {
+    const { amount, currency, remark } = req.body;
+    const s = await prisma.settlement.create({
+      data: {
+        amount: parseFloat(amount),
+        currency: currency || 'AED',
+        merchantId: req.user.merchantId,
+        remark,
+      }
+    });
+    res.status(201).json({ success: true, data: s });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
 });
 
 router.get('/settlements', async (req, res) => {

@@ -75,29 +75,69 @@ router.get("/dashboard", async (req, res) => {
     const availableLimit = parseFloat(pendingAvailable._sum.amount || 0);
     // Calculate Pay Out in AED and USDT
     const rateConfig = await prisma.rateConfig.findFirst({
-      where: { OR: [{ agentId: req.user.agentId }, { merchantId: { in: assigned.map(a => a.merchantId) } }], isActive: true },
+      where: {
+        OR: [
+          { agentId: req.user.agentId },
+          { merchantId: { in: assigned.map((a) => a.merchantId) } },
+        ],
+        isActive: true,
+      },
       orderBy: { updatedAt: "desc" },
     });
     const payOutAmount = parseFloat(payOutAgg._sum.amount || 0);
     const aedRate = parseFloat(rateConfig?.aedTodayRate || 0);
     const usdtRate = parseFloat(rateConfig?.usdtTodayRate || 0);
-    
-    const totalPaymentLunga = payOutAmount - (commAgg._sum.agentCommission || 0);
-    const payOutInAed = aedRate > 0 ? totalPaymentLunga / aedRate : 0;
-    const payOutInUsdt = usdtRate > 0 ? totalPaymentLunga / usdtRate : 0;
-    
+
+    // Confirmed settlements paid to agent
+    const [confirmedAed, confirmedUsdt] = await Promise.all([
+      prisma.settlement.aggregate({
+        where: { agentId, status: "CONFIRMED", currency: "AED" },
+        _sum: { amount: true },
+      }),
+      prisma.settlement.aggregate({
+        where: { agentId, status: "CONFIRMED", currency: "USDT" },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const confirmedAedAmount = parseFloat(confirmedAed._sum.amount || 0);
+    const confirmedUsdtAmount = parseFloat(confirmedUsdt._sum.amount || 0);
+
+    // Convert confirmed AED/USDT to INR to subtract from totalPaymentLunga
+    const totalPaymentLunga =
+      payOutAmount - parseFloat(commAgg._sum.agentCommission || 0);
+
+    const payOutInAed =
+      aedRate > 0
+        ? Math.max(0, totalPaymentLunga / aedRate - confirmedAedAmount)
+        : 0;
+
+    const payOutInUsdt =
+      usdtRate > 0
+        ? Math.max(0, totalPaymentLunga / usdtRate - confirmedUsdtAmount)
+        : 0;
+
+    const confirmedInInr =
+      (aedRate > 0 ? confirmedAedAmount * aedRate : 0) +
+      (usdtRate > 0 ? confirmedUsdtAmount * usdtRate : 0);
+
+    const adjustedPaymentLunga = Math.max(
+      0,
+      totalPaymentLunga - confirmedInInr,
+    );
+
     res.json({
       success: true,
       data: {
-      totalAgentCommission: commAgg._sum.agentCommission || 0,
-      totalPayOutAmount: payOutAmount,
-      totalPayOutTransactions: payOutCount,
-      totalPendingTransactions: pendingCount,
-      totalPendingAmount: pendingAmt._sum.amount || 0,
-      availableLimit,
-      totalPaymentLunga,
-      payOutInAed,
-      payOutInUsdt,
+        totalAgentCommission: commAgg._sum.agentCommission || 0,
+        totalPayOutAmount: payOutAmount,
+        totalPayOutTransactions: payOutCount,
+        totalPendingTransactions: pendingCount,
+        totalPendingAmount: pendingAmt._sum.amount || 0,
+        availableLimit,
+        totalPaymentLunga: adjustedPaymentLunga,
+        payOutInAed,
+        payOutInUsdt,
       },
     });
   } catch (error) {
@@ -139,9 +179,17 @@ router.post("/operators", async (req, res) => {
       !commissionChargePercent
     )
       return res.status(400).json({ success: false, message: "Required." });
-    const agent = await prisma.agent.findUnique({ where: { id: req.user.agentId } });
-    if (parseFloat(commissionChargePercent) <= parseFloat(agent.commissionChargePercent)) {
-      return res.status(400).json({ success: false, message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).` });
+    const agent = await prisma.agent.findUnique({
+      where: { id: req.user.agentId },
+    });
+    if (
+      parseFloat(commissionChargePercent) <=
+      parseFloat(agent.commissionChargePercent)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).`,
+      });
     }
     const op = await prisma.operator.create({
       data: {
@@ -182,9 +230,17 @@ router.put("/operators/:id", async (req, res) => {
     if (minTransactionAmount !== undefined)
       data.minTransactionAmount = parseFloat(minTransactionAmount);
     if (commissionChargePercent !== undefined) {
-      const agent = await prisma.agent.findUnique({ where: { id: req.user.agentId } });
-      if (parseFloat(commissionChargePercent) <= parseFloat(agent.commissionChargePercent)) {
-        return res.status(400).json({ success: false, message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).` });
+      const agent = await prisma.agent.findUnique({
+        where: { id: req.user.agentId },
+      });
+      if (
+        parseFloat(commissionChargePercent) <=
+        parseFloat(agent.commissionChargePercent)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).`,
+        });
       }
       data.commissionChargePercent = parseFloat(commissionChargePercent);
     }
@@ -409,7 +465,9 @@ router.post("/settlements", upload.single("image"), async (req, res) => {
       data: {
         amount: 0,
         agent: { connect: { id: req.user.agentId } },
-        ...(merchantId ? { merchant: { connect: { id: parseInt(merchantId) } } } : {}),
+        ...(merchantId
+          ? { merchant: { connect: { id: parseInt(merchantId) } } }
+          : {}),
         remark: remark || null,
         proofImage: req.file ? req.file.filename : null,
       },
@@ -421,5 +479,111 @@ router.post("/settlements", upload.single("image"), async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+router.post("/settlements/:id/pick", async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    if (!settlement)
+      return res.status(404).json({ success: false, message: "Not found." });
+    if (settlement.agentId !== req.user.agentId)
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your settlement." });
+    if (settlement.status !== "PENDING")
+      return res
+        .status(400)
+        .json({ success: false, message: "Already picked." });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: "PICKED" },
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
 
+router.post(
+  "/settlements/:id/submit",
+  upload.single("qrImage"),
+  async (req, res) => {
+    try {
+      const settlement = await prisma.settlement.findUnique({
+        where: { id: parseInt(req.params.id) },
+      });
+      if (!settlement)
+        return res.status(404).json({ success: false, message: "Not found." });
+      if (settlement.agentId !== req.user.agentId)
+        return res
+          .status(403)
+          .json({ success: false, message: "Not your settlement." });
+      if (settlement.status !== "PICKED")
+        return res
+          .status(400)
+          .json({ success: false, message: "Must be picked first." });
+      const { walletAddress } = req.body;
+      const updated = await prisma.settlement.update({
+        where: { id: parseInt(req.params.id) },
+        data: {
+          status: "SUBMITTED",
+          walletAddress: walletAddress || null,
+          proofImage: req.file ? req.file.filename : settlement.proofImage,
+        },
+      });
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server error." });
+    }
+  },
+);
+
+router.post("/settlements/:id/reject", async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    if (!settlement)
+      return res.status(404).json({ success: false, message: "Not found." });
+    if (settlement.agentId !== req.user.agentId)
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your settlement." });
+    if (settlement.status !== "PICKED")
+      return res
+        .status(400)
+        .json({ success: false, message: "Must be picked first." });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: "REJECTED" },
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+router.post("/settlements/:id/confirm", async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    if (!settlement)
+      return res.status(404).json({ success: false, message: "Not found." });
+    if (settlement.agentId !== req.user.agentId)
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your settlement." });
+    if (settlement.status !== "PAID")
+      return res
+        .status(400)
+        .json({ success: false, message: "Must be paid first." });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: "CONFIRMED" },
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
 module.exports = router;

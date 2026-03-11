@@ -33,11 +33,18 @@ router.get('/ledger', async (req, res) => {
 
 // ─── Settlements ───
 router.get('/settlements', async (req, res) => {
-  console.log('collector settlements hit', req.user.collectorId);
   try {
     const data = await prisma.settlement.findMany({
-      where: { status: 'PENDING' },
-      include: { merchant: { select: { name: true } } },
+      where: {
+        OR: [
+          { status: 'PENDING', collectorId: null },        // merchant requests to pick
+          { collectorId: req.user.collectorId },            // this collector's own records
+        ]
+      },
+      include: {
+        merchant: { select: { name: true } },
+        agent: { select: { name: true } },
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, data });
@@ -80,6 +87,44 @@ router.post('/settlements/:id/reject', async (req, res) => {
     const updated = await prisma.settlement.update({
       where: { id: parseInt(req.params.id) },
       data: { status: 'REJECTED' }
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+router.get('/agents', async (req, res) => {
+  try {
+    const data = await prisma.agent.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' }
+    });
+    res.json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+
+router.post('/settlements', async (req, res) => {
+  try {
+    const { amount, currency, agentId, remark } = req.body;
+    const s = await prisma.settlement.create({
+      data: {
+        amount: parseFloat(amount),
+        currency: currency || 'AED',
+        collectorId: req.user.collectorId,
+        agentId: agentId ? parseInt(agentId) : null,
+        remark,
+      }
+    });
+    res.status(201).json({ success: true, data: s });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+router.post('/settlements/:id/pay', async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({ where: { id: parseInt(req.params.id) } });
+    if (!settlement) return res.status(404).json({ success: false, message: 'Not found.' });
+    if (settlement.status !== 'SUBMITTED') return res.status(400).json({ success: false, message: 'Must be submitted first.' });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: 'PAID' }
     });
     res.json({ success: true, data: updated });
   } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }

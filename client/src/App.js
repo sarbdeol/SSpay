@@ -11,7 +11,7 @@ import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, Merchant
 import { SubMerchantDashboard, SubMerchantLedger, SubMerchantTransactions } from './pages/submerchant';
 import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements } from './pages/agent';
 import { OperatorDashboard, OperatorTransactions } from './pages/operator';
-import { CollectorDashboard, CollectorRequests, CollectorLedger } from './pages/collector';
+import { CollectorDashboard, CollectorRequests, CollectorLedger ,CollectorSettlements  } from './pages/collector';
 import { ExpenseManagerDashboard, ExpenseManagerEntries } from './pages/expense-manager';
 
 function ProtectedRoute({ children, roles }) {
@@ -89,6 +89,7 @@ export default function App() {
           <Route path="/collector" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorDashboard /></ProtectedRoute>} />
           <Route path="/collector/daily-report" element={<ProtectedRoute roles={['COLLECTOR']}><DailyReport /></ProtectedRoute>} />
           <Route path="/collector/requests" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorRequests /></ProtectedRoute>} />
+          <Route path="/collector/settlements" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorSettlements /></ProtectedRoute>} />
           <Route path="/collector/ledger" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorLedger /></ProtectedRoute>} />
 
           {/* Expense Manager */}

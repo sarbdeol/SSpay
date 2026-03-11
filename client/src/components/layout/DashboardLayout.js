@@ -63,7 +63,7 @@ const MENUS = {
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/collector' },
     { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/collector/daily-report' },
     { label: 'Configuration', icon: HiOutlineCog, children: [
-      { label: 'Requests', path: '/collector/requests' },
+      { label: 'Settlements', path: '/collector/settlements' },
       { label: 'Ledger', path: '/collector/ledger' },
     ]},
   ],
