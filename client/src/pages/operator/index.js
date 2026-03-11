@@ -177,7 +177,7 @@ export function OperatorDashboard() {
         <StatCard title="Total AED Lunga" value={stats?.totalAedLunga || 0} prefix="AED " index={5} />
         <StatCard title="Total USDT Lunga" value={stats?.totalUsdtLunga || 0} prefix="USDT " index={0} />
         <StatCard title="Available Details" value={stats?.availableLimit || 0} index={6} />
-        <StatCard title="Operator Commission Amount" value={stats?.operatorCommissionAmount || 0} index={1} />
+        <StatCard title="Agent Commission Amount" value={stats?.agentCommissionAmount || 0} index={1} />
       </div>
     </div>
   );

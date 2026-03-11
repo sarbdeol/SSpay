@@ -94,8 +94,8 @@ router.get("/dashboard", async (req, res) => {
     const commissionPercent = parseFloat(
       operator?.commissionChargePercent || 0,
     );
-    const operatorCommissionAmount = (totalAmount * commissionPercent) / 100;
-    const totalPaymentLunga = totalAmount - operatorCommissionAmount;
+    const agentCommissionAmount = (totalAmount * commissionPercent) / 100;
+    const totalPaymentLunga = totalAmount - agentCommissionAmount;
     res.json({
       success: true,
       data: {
@@ -103,7 +103,7 @@ router.get("/dashboard", async (req, res) => {
         totalTransferCount: transferAgg._count || 0,
         totalPendingAmount: pendingAgg._sum.amount || 0,
         totalPendingCount: pendingAgg._count || 0,
-        operatorCommissionAmount,  // ✅ e.g. 657.505
+        agentCommissionAmount,  // ✅ e.g. 657.505
 
         totalPaymentLunga,
         totalAedLunga: aedLunga,
