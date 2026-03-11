@@ -91,6 +91,10 @@ router.post('/transactions', async (req, res) => {
         }
       });
       await tx.merchant.update({ where: { id: subMerchant.merchantId }, data: { usedLimit: { increment: parseFloat(amount) } } });
+      // Add ledger entry
+      const lastLedger = await tx.ledger.findFirst({ where: { subMerchantId }, orderBy: { createdAt: 'desc' } });
+      const prevBalance = lastLedger ? parseFloat(lastLedger.balanceAfter) : 0;
+      await tx.ledger.create({ data: { entryType: 'DEBIT', amount: parseFloat(amount), description: `Transaction #${txn.id} - ${transactionType} - ${notes || 'No remark'}`, balanceAfter: prevBalance + parseFloat(amount), subMerchantId } });
       return txn;
     });
     res.status(201).json({ success: true, data: transaction });

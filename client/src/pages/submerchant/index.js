@@ -142,31 +142,43 @@ export function SubMerchantDashboard() {
 
 export function SubMerchantLedger() {
   const [items, setItems] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+
   useEffect(() => {
     api.get("/submerchant/ledger").then((r) => setItems(r.data.data));
+    api.get("/submerchant/transactions?limit=100").then((r) => setTransactions(r.data.data || []));
   }, []);
+
+  // If no ledger entries, show transactions as ledger
+  const ledgerData = items.length > 0 ? items : transactions.map((tx, i) => ({
+    entryType: tx.status === 'CLEARED' ? 'CLEARED' : tx.status === 'REJECTED' ? 'REJECTED' : 'PENDING',
+    amount: tx.amount,
+    description: `#${tx.id} ${tx.transactionType} - ${tx.notes || 'No remark'} - UTR: ${tx.utrNumber || 'N/A'}`,
+    balanceAfter: transactions.slice(0, i + 1).filter(t => t.status !== 'REJECTED').reduce((s, t) => s + parseFloat(t.amount), 0),
+    createdAt: tx.createdAt,
+    status: tx.status,
+  }));
+
   return (
     <div>
       <PageHeader title="All Ledger" />
       <DataTable
         columns={[
-          { header: "Type", key: "entryType" },
-          {
-            header: "Amount",
-            render: (r) => `₹${parseFloat(r.amount).toLocaleString()}`,
-          },
-          { header: "Description", render: (r) => r.description || "-" },
-          {
-            header: "Balance",
-            render: (r) => `₹${parseFloat(r.balanceAfter).toLocaleString()}`,
-          },
-          {
-            header: "Date",
-            render: (r) => new Date(r.createdAt).toLocaleString(),
-          },
+          { header: "Type", render: (r) => (
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+              r.entryType === 'CLEARED' || r.entryType === 'CREDIT' ? 'bg-green-100 text-green-700' :
+              r.entryType === 'REJECTED' ? 'bg-red-100 text-red-700' :
+              r.entryType === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>{r.entryType || r.status || '-'}</span>
+          )},
+          { header: "Amount", render: (r) => `₹${parseFloat(r.amount).toLocaleString()}` },
+          { header: "Description", render: (r) => <span className="text-xs">{r.description || "-"}</span> },
+          { header: "Running Balance", render: (r) => `₹${parseFloat(r.balanceAfter || 0).toLocaleString()}` },
+          { header: "Date", render: (r) => new Date(r.createdAt).toLocaleString() },
         ]}
-        data={items}
-        total={items.length}
+        data={ledgerData}
+        total={ledgerData.length}
         page={1}
       />
     </div>

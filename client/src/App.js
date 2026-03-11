@@ -63,6 +63,7 @@ export default function App() {
           <Route path="/merchant/submerchants" element={<ProtectedRoute roles={['MERCHANT']}><MerchantSubmerchants /></ProtectedRoute>} />
           <Route path="/merchant/transactions" element={<ProtectedRoute roles={['MERCHANT']}><MerchantTransactions /></ProtectedRoute>} />
           <Route path="/merchant/configuration" element={<ProtectedRoute roles={['MERCHANT']}><MerchantConfiguration /></ProtectedRoute>} />
+          <Route path="/merchant/settlements" element={<ProtectedRoute roles={['MERCHANT']}><MerchantSettlements /></ProtectedRoute>} />
 
           {/* Sub-Merchant */}
           <Route path="/submerchant" element={<ProtectedRoute roles={['SUB_MERCHANT']}><SubMerchantDashboard /></ProtectedRoute>} />

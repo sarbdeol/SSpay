@@ -58,3 +58,91 @@ export function CollectorLedger() {
     </div>
   );
 }
+
+export function CollectorSettlements() {
+  const [items, setItems] = useState([]);
+
+  const loadItems = () => api.get('/collector/settlements').then(r => setItems(r.data.data));
+  useEffect(() => { loadItems(); }, []);
+
+  const handlePick = async (id) => {
+    try {
+      await api.post(`/collector/settlements/${id}/pick`);
+      toast.success('Picked!');
+      loadItems();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+
+  const handleSubmit = async (id) => {
+    try {
+      await api.post(`/collector/settlements/${id}/submit`);
+      toast.success('Submitted!');
+      loadItems();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+
+  const handleReject = async (id) => {
+    const reason = window.prompt('Enter reject reason:');
+    if (!reason) return;
+    try {
+      await api.post(`/collector/settlements/${id}/reject`, { reason });
+      toast.success('Rejected.');
+      loadItems();
+    } catch (e) { toast.error(e.response?.data?.message || 'Error.'); }
+  };
+
+  const statusLabel = (status) => {
+    switch (status) {
+      case 'PENDING':   return 'Pending';
+      case 'PICKED':    return 'Picked by You';
+      case 'SUBMITTED': return 'Submitted';
+      case 'REJECTED':  return 'Rejected';
+      default:          return status;
+    }
+  };
+
+  const statusStyle = (status) => {
+    switch (status) {
+      case 'SUBMITTED': return 'bg-emerald-100 text-emerald-700';
+      case 'PICKED':    return 'bg-blue-100 text-blue-700';
+      case 'REJECTED':  return 'bg-red-100 text-red-700';
+      default:          return 'bg-amber-100 text-amber-700';
+    }
+  };
+
+  return (
+    <div>
+      <PageHeader title="Settlements" />
+      <DataTable
+        columns={[
+          { header: 'Amount', render: r => `${r.currency} ${parseFloat(r.amount).toLocaleString()}` },
+          { header: 'Merchant', render: r => r.merchant?.name || '-' },
+          { header: 'Remark', render: r => r.remark || '-' },
+          { header: 'Date', render: r => new Date(r.createdAt).toLocaleString() },
+          {
+            header: 'Status',
+            render: r => (
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle(r.status)}`}>
+                {statusLabel(r.status)}
+              </span>
+            ),
+          },
+        ]}
+        data={items} total={items.length} page={1}
+        actions={r => (
+          <div className="flex gap-1">
+            {r.status === 'PENDING' && (
+              <Button onClick={() => handlePick(r.id)} variant="primary" className="h-7 px-2 text-xs">Pick</Button>
+            )}
+            {r.status === 'PICKED' && (
+              <>
+                <Button onClick={() => handleSubmit(r.id)} variant="primary" className="h-7 px-2 text-xs">Submit</Button>
+                <Button onClick={() => handleReject(r.id)} variant="danger" className="h-7 px-2 text-xs">Reject</Button>
+              </>
+            )}
+          </div>
+        )}
+      />
+    </div>
+  );
+}

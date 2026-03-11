@@ -31,4 +31,56 @@ router.get('/ledger', async (req, res) => {
   catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
 });
 
+// ─── Settlements ───
+router.get('/settlements', async (req, res) => {
+  try {
+    const data = await prisma.settlement.findMany({
+      where: { status: 'PENDING' },
+      include: { merchant: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+
+router.post('/settlements/:id/pick', async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({ where: { id: parseInt(req.params.id) } });
+    if (!settlement) return res.status(404).json({ success: false, message: 'Not found.' });
+    if (settlement.status !== 'PENDING') return res.status(400).json({ success: false, message: 'Already picked.' });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: 'PICKED', collectorId: req.user.collectorId }
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+
+router.post('/settlements/:id/submit', async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({ where: { id: parseInt(req.params.id) } });
+    if (!settlement) return res.status(404).json({ success: false, message: 'Not found.' });
+    if (settlement.collectorId !== req.user.collectorId) return res.status(403).json({ success: false, message: 'Not your settlement.' });
+    if (settlement.status !== 'PICKED') return res.status(400).json({ success: false, message: 'Must be picked first.' });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: 'SUBMITTED' }
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+
+router.post('/settlements/:id/reject', async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({ where: { id: parseInt(req.params.id) } });
+    if (!settlement) return res.status(404).json({ success: false, message: 'Not found.' });
+    if (settlement.collectorId !== req.user.collectorId) return res.status(403).json({ success: false, message: 'Not your settlement.' });
+    if (settlement.status !== 'PICKED') return res.status(400).json({ success: false, message: 'Must be picked first.' });
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: 'REJECTED' }
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
 module.exports = router;

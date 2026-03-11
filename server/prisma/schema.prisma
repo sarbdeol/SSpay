@@ -44,7 +44,8 @@ enum TransactionStatus {
 
 enum SettlementStatus {
   PENDING
-  APPROVED
+  PICKED
+  SUBMITTED
   REJECTED
 }
 
@@ -357,6 +358,7 @@ model RateConfig {
 model Settlement {
   id              Int              @id @default(autoincrement())
   amount          Decimal          @db.Decimal(15, 2)
+  currency  String   @default("AED")
   remark          String?
   status          SettlementStatus @default(PENDING)
   createdAt       DateTime         @default(now())

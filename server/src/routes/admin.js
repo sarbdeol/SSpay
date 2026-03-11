@@ -294,6 +294,9 @@ router.get('/trial-balance', async (req, res) => {
     const totalCredit = creditEntries.reduce((s, e) => s + e.amount, 0);
     const totalDebit = debitEntries.reduce((s, e) => s + e.amount, 0);
 
+    const adminCommAgg = await prisma.transaction.aggregate({ where: txWhere, _sum: { adminCommission: true } });
+    const totalAdminCommission = parseFloat(adminCommAgg._sum.adminCommission || 0);
+
     res.json({
       success: true,
       data: {
@@ -301,11 +304,18 @@ router.get('/trial-balance', async (req, res) => {
         debit: debitEntries,
         totalCredit,
         totalDebit,
+        totalAdminCommission,
       }
     });
   } catch (error) {
     console.error('Trial balance error:', error);
     res.status(500).json({ success: false, message: 'Server error.' });
   }
+});
+router.get('/merchants/:id/agents', async (req, res) => {
+  try {
+    const data = await prisma.merchantAgent.findMany({ where: { merchantId: parseInt(req.params.id) }, select: { agentId: true } });
+    res.json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
 });
 module.exports = router;

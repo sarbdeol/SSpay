@@ -49,7 +49,7 @@ export function MerchantTransactions() {
       <PageHeader title="Transactions List" />
       <DataTable columns={[
         { header: 'ID', key: 'id' },
-        { header: 'Amount', render: r => `₹${parseFloat(r.amount).toLocaleString()}` },
+        { header: 'Amount', render: r => `${r.currency} ${parseFloat(r.amount).toLocaleString()}` },
         { header: 'UTR', render: r => r.utrNumber || '-' },
         { header: 'UPI ID', render: r => r.upiId || '-' },
         { header: 'Remark', render: r => r.notes || '-' },
@@ -133,16 +133,88 @@ export function MerchantSubmerchants() {
 export function MerchantSettlements() {
   const [items, setItems] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ amount: '', collectorId: '', remark: '' });
-  const fetch = () => api.get('/merchant/settlements').then(r => setItems(r.data.data));
-  useEffect(() => { fetch(); }, []);
-  const handleCreate = async (e) => { e.preventDefault(); try { await api.post('/merchant/settlements', form); toast.success('Created!'); setShowCreate(false); fetch(); } catch (e) { toast.error('Error.'); } };
+  const [form, setForm] = useState({ amount: '', currency: 'AED', remark: '' });
+
+  const loadItems = () => api.get('/merchant/settlements').then(r => setItems(r.data.data));
+
+  useEffect(() => { loadItems(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/merchant/settlements', form);
+      toast.success('Settlement request created!');
+      setShowCreate(false);
+      setForm({ amount: '', currency: 'AED', remark: '' });
+      loadItems();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create settlement.');
+    }
+  };
+
+  const statusLabel = (status) => {
+    switch (status) {
+      case 'PENDING':   return 'Pending';
+      case 'PICKED':    return 'Picked by Collector';
+      case 'SUBMITTED': return 'Submitted by Collector';
+      case 'REJECTED':  return 'Rejected by Collector';
+      default:          return status;
+    }
+  };
+
+  const statusStyle = (status) => {
+    switch (status) {
+      case 'SUBMITTED': return 'bg-emerald-100 text-emerald-700';
+      case 'PICKED':    return 'bg-blue-100 text-blue-700';
+      case 'REJECTED':  return 'bg-red-100 text-red-700';
+      default:          return 'bg-amber-100 text-amber-700';
+    }
+  };
+
   return (
     <div>
-      <PageHeader title="Settlement Transactions" action={<Button onClick={() => setShowCreate(true)}>Create</Button>} />
-      <DataTable columns={[{ header: 'Amount', render: r => `₹${parseFloat(r.amount).toLocaleString()}` }, { header: 'Collector', render: r => r.collector?.name || '-' }, { header: 'Remark', render: r => r.remark || '-' }, { header: 'Status', render: r => <StatusBadge status={r.status} /> }]} data={items} total={items.length} page={1} />
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Settlement to Collector">
-        <form onSubmit={handleCreate}><FormInput label="Amount" required type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /><FormInput label="Collector ID" value={form.collectorId} onChange={e => setForm({ ...form, collectorId: e.target.value })} /><FormInput label="Remark" value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })} /><Button type="submit" className="w-full">Create</Button></form>
+      <PageHeader
+        title="Settlement Transactions"
+        action={<Button onClick={() => setShowCreate(true)}>Create Request</Button>}
+      />
+      <DataTable
+        columns={[
+          { header: 'Amount', render: r => `${r.currency} ${parseFloat(r.amount).toLocaleString()}` },
+          { header: 'Collector', render: r => r.collector?.name || '-' },
+          { header: 'Remark', render: r => r.remark || '-' },
+          { header: 'Date', render: r => new Date(r.createdAt).toLocaleString() },
+          {
+            header: 'Status',
+            render: r => (
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle(r.status)}`}>
+                {statusLabel(r.status)}
+              </span>
+            ),
+          },
+        ]}
+        data={items} total={items.length} page={1}
+      />
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Settlement Request">
+        <form onSubmit={handleCreate}>
+          <FormSelect
+  label="Currency"
+  required
+  options={[{ value: 'AED', label: 'AED' }, { value: 'USDT', label: 'USDT' }]}
+  value={form.currency}
+  onChange={e => setForm({ ...form, currency: e.target.value })}
+/>
+<FormInput
+  label={`Amount (${form.currency})`}
+  required
+  type="number"
+  step="0.01"
+  min="0"
+  value={form.amount}
+  onChange={e => setForm({ ...form, amount: e.target.value })}
+/>
+          <FormInput label="Remark" value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })} />
+          <Button type="submit" className="w-full">Submit Request</Button>
+        </form>
       </Modal>
     </div>
   );

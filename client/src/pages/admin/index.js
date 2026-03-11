@@ -72,13 +72,14 @@ function EditUserDetailModal({ open, onClose, entity, entityType, onSaved }) {
     username: "",
     newPassword: "",
     isActive: true,
-    // merchant-specific
     maxPaymentLimit: "",
     commissionChargePercent: "",
-    // agent-specific (also used by merchant)
     agentCommissionChargePercent: "",
+    assignAgentIds: [],
+    assignAll: false,
   });
   const [saving, setSaving] = useState(false);
+  const [agents, setAgents] = useState([]);
 
   useEffect(() => {
     if (entity) {
@@ -91,9 +92,17 @@ function EditUserDetailModal({ open, onClose, entity, entityType, onSaved }) {
         maxPaymentLimit: entity.maxPaymentLimit || "",
         commissionChargePercent: entity.commissionChargePercent || "",
         agentCommissionChargePercent: entity.commissionChargePercent || "",
+        assignAgentIds: [],
+        assignAll: false,
       });
+      if (entityType === "merchant" && entity.id) {
+        api.get("/admin/agents?limit=100").then(r => setAgents(r.data.data || []));
+        api.get(`/admin/merchants/${entity.id}/agents`).then(r => {
+          setForm(prev => ({ ...prev, assignAgentIds: (r.data.data || []).map(a => a.agentId.toString()) }));
+        }).catch(() => {});
+      }
     }
-  }, [entity]);
+  }, [entity, entityType]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,6 +119,10 @@ function EditUserDetailModal({ open, onClose, entity, entityType, onSaved }) {
       }
 
       // Update entity
+      if (entityType === "merchant") {
+        entityPayload.assignAll = form.assignAll;
+        entityPayload.assignAgentIds = form.assignAgentIds;
+      }
       await api.put(`/admin/${entityType}s/${entity.id}`, entityPayload);
 
       // Update username / password if changed
@@ -175,15 +188,29 @@ function EditUserDetailModal({ open, onClose, entity, entityType, onSaved }) {
                 />
               </>
             )}
-            {entityType === "agent" && (
-              <FormInput
-                label="Commission Charge %"
-                type="number"
-                step="0.01"
-                value={form.agentCommissionChargePercent}
-                onChange={(e) => setForm({ ...form, agentCommissionChargePercent: e.target.value })}
-                placeholder="e.g. 2.5"
-              />
+            {entityType === "merchant" && agents.length > 0 && (
+              <div className="mt-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned Agents</label>
+                <div className="flex items-center gap-3 mb-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.assignAll} onChange={() => setForm({ ...form, assignAll: !form.assignAll, assignAgentIds: [] })} className="w-4 h-4 rounded border-gray-300 text-brand-500" />
+                    <span className="text-sm text-gray-600">Select All Agents</span>
+                  </label>
+                </div>
+                {!form.assignAll && (
+                  <div className="border border-gray-200 rounded-xl p-3 max-h-40 overflow-y-auto space-y-2">
+                    {agents.map(a => (
+                      <label key={a.id} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={form.assignAgentIds.includes(a.id.toString())} onChange={() => {
+                          const id = a.id.toString();
+                          setForm({ ...form, assignAgentIds: form.assignAgentIds.includes(id) ? form.assignAgentIds.filter(i => i !== id) : [...form.assignAgentIds, id] });
+                        }} className="w-4 h-4 rounded border-gray-300 text-brand-500" />
+                        <span className="text-sm text-gray-700">{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             <Toggle
               label="Is Active"
@@ -238,6 +265,7 @@ export function AdminMerchants() {
     username: "",
     password: "",
     assignAgentIds: [],
+    assignAll: false,
     isActive: true,
   });
   const { impersonate } = useAuth();
@@ -264,10 +292,11 @@ export function AdminMerchants() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
+      if (!form.assignAll && form.assignAgentIds.length === 0) { toast.error("At least one agent required."); return; }
       await api.post("/admin/merchants", form);
       toast.success("Merchant created!");
       setShowCreate(false);
-      setForm({ name: "", description: "", maxPaymentLimit: "", commissionChargePercent: "", username: "", password: "", assignAgentIds: [], isActive: true });
+      setForm({ name: "", description: "", maxPaymentLimit: "", commissionChargePercent: "", username: "", password: "", assignAgentIds: [], assignAll: false, isActive: true });
       fetchMerchants();
     } catch (e) {
       toast.error(e.response?.data?.message || "Error.");
@@ -336,7 +365,29 @@ export function AdminMerchants() {
           <FormTextarea label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional description" />
           <FormInput label="Maximum Payment Limit" required type="number" value={form.maxPaymentLimit} onChange={(e) => setForm({ ...form, maxPaymentLimit: e.target.value })} placeholder="e.g 500000" />
           <FormInput label="Commission Charge Percent" required type="number" step="0.01" value={form.commissionChargePercent} onChange={(e) => setForm({ ...form, commissionChargePercent: e.target.value })} placeholder="e.g 4, 0.8, 2.6" />
-          <FormSelect label="Assign Agents" options={agents.map((a) => ({ value: a.id, label: a.name }))} placeholder="Select agent" value={form.assignAgentIds[0] || ""} onChange={(e) => setForm({ ...form, assignAgentIds: e.target.value ? [e.target.value] : [] })} />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Assign Agents *</label>
+            <div className="flex items-center gap-3 mb-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.assignAll} onChange={() => setForm({ ...form, assignAll: !form.assignAll, assignAgentIds: [] })} className="w-4 h-4 rounded border-gray-300 text-brand-500" />
+                <span className="text-sm text-gray-600">Select All Agents</span>
+              </label>
+            </div>
+            {!form.assignAll && (
+              <div className="border border-gray-200 rounded-xl p-3 max-h-40 overflow-y-auto space-y-2">
+                {agents.map(a => (
+                  <label key={a.id} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.assignAgentIds.includes(a.id.toString())} onChange={() => {
+                      const id = a.id.toString();
+                      setForm({ ...form, assignAgentIds: form.assignAgentIds.includes(id) ? form.assignAgentIds.filter(i => i !== id) : [...form.assignAgentIds, id] });
+                    }} className="w-4 h-4 rounded border-gray-300 text-brand-500" />
+                    <span className="text-sm text-gray-700">{a.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {!form.assignAll && form.assignAgentIds.length === 0 && <p className="text-xs text-red-400 mt-1">At least one agent required</p>}
+          </div>
           <FormInput label="Username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Login username" />
           <FormInput label="Password" required type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Login password" />
           <Toggle label="Is Active" checked={form.isActive} onChange={() => setForm({ ...form, isActive: !form.isActive })} />
@@ -1101,14 +1152,23 @@ export function AdminTrialBalance() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
-
+  const [merchantRates, setMerchantRates] = useState({});
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
-    const r = await api.get('/admin/trial-balance', { params });
+    const [r, rateRes] = await Promise.all([
+      api.get('/admin/trial-balance', { params }),
+      api.get('/config/rates'),
+    ]);
     setData(r.data.data);
+    const rateMap = {};
+    (rateRes.data.data || []).forEach((rt) => {
+      if (rt.merchantId) rateMap[rt.merchantId] = parseFloat(rt.aedTodayRate || 1);
+      if (rt.agentId) rateMap['agent_' + rt.agentId] = parseFloat(rt.aedTodayRate || 1);
+    });
+    setMerchantRates(rateMap);
     setLoading(false);
   }, [startDate, endDate]);
 
@@ -1118,10 +1178,26 @@ export function AdminTrialBalance() {
 
   const credit = (data?.credit || []).filter(e => !search || e.name.toLowerCase().includes(search.toLowerCase()));
   const debit = (data?.debit || []).filter(e => !search || e.name.toLowerCase().includes(search.toLowerCase()));
-  const totalCredit = credit.reduce((s, e) => s + e.amount, 0);
-  const totalDebit = debit.reduce((s, e) => s + e.amount, 0);
-  const maxRows = Math.max(credit.length, debit.length, 1);
+  
+  // Admin commission (deducted from credit side)
+  const totalAdminComm = data?.totalAdminCommission || credit.reduce((s, e) => s + (e.commission || 0), 0);
+  const creditExtras = [];
+  if (totalAdminComm > 0) creditExtras.push({ name: 'ADMIN COMMISSION', amount: totalAdminComm });
 
+  const debitExtras = [];
+
+  // Credit total = agent amounts (no deduction)
+  const totalCredit = credit.reduce((s, e) => s + e.amount, 0);
+  // Debit total = merchant amounts
+  const totalDebit = debit.reduce((s, e) => s + e.amount, 0);
+  const maxCreditRows = Math.max(credit.length, creditExtras.length, 1);
+  const maxDebitRows = Math.max(debit.length, debitExtras.length, 1);
+  const maxRows = Math.max(maxCreditRows, maxDebitRows);
+  // AED conversions
+  const totalDebitAed = credit.reduce((s, e) => {
+    const rate = merchantRates['agent_' + e.id] || Object.values(merchantRates)[0] || 1;
+    return s + (rate > 0 ? e.amount / rate : 0);
+  }, 0);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -1129,73 +1205,86 @@ export function AdminTrialBalance() {
         <DateFilter startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
       </div>
 
-      {/* Controls */}
-      <div className="bg-gray-100 border border-gray-200 rounded-t-xl px-4 py-3 flex items-center gap-4">
+      <div className="bg-gray-100 border border-gray-200 rounded-t-xl px-4 py-3 flex items-center gap-4 flex-wrap">
         <span className="text-sm font-semibold text-gray-700">Party Name</span>
         <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="h-8 px-3 text-sm border border-gray-300 rounded-lg w-48 outline-none focus:border-brand-500" />
         <button onClick={fetchData} className="h-8 px-4 bg-gray-200 text-sm font-medium rounded-lg hover:bg-gray-300">Show</button>
+        <button onClick={() => window.print()} className="h-8 px-4 bg-gray-200 text-sm font-medium rounded-lg hover:bg-gray-300">Print</button>
         <button onClick={fetchData} className="h-8 px-4 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600">Refresh</button>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th colSpan={2} className="border border-gray-300 bg-blue-50 px-3 py-2 text-center font-bold text-blue-800">Credit / Jama / Dena (From Agents)</th>
-              <th colSpan={2} className="border border-gray-300 bg-red-50 px-3 py-2 text-center font-bold text-red-800">Debit / Lena (To Merchants)</th>
+              <th colSpan={4} className="border border-gray-300 bg-blue-50 px-3 py-2 text-center font-bold text-blue-800">Credit / Jama / Dena</th>
+              <th colSpan={4} className="border border-gray-300 bg-red-50 px-3 py-2 text-center font-bold text-red-800">Debit / Lena</th>
             </tr>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 w-[35%]">Name</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[15%]">Amount (Cr)</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 w-[35%]">Name</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[15%]">Amount (Dr)</th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Name</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (Cr)</th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Name</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (Cr)</th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Name</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (Dr)</th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Name</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (Dr)</th>
             </tr>
           </thead>
           <tbody>
             {Array.from({ length: maxRows }).map((_, i) => (
               <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                <td className="border border-gray-200 px-3 py-1.5 text-gray-800">
-                  {credit[i] ? <span className="flex items-center gap-2"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{credit[i].name}</span> : ''}
+                {/* Credit Col 1 - Agents */}
+                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
+                  {credit[i] ? <span className="flex items-center gap-1"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{credit[i].name}</span> : ''}
                 </td>
-                <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-blue-700">
-                  {credit[i] ? `₹${credit[i].amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : ''}
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
+                  {credit[i] ? (
+                    <div>
+                      <div>{(credit[i].amount - credit[i].commission).toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
+                    </div>
+                  ) : ''}
                 </td>
-                <td className="border border-gray-200 px-3 py-1.5 text-gray-800">
-                  {debit[i] ? <span className="flex items-center gap-2"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{debit[i].name}</span> : ''}
+                {/* Credit Col 2 - Extras (Admin Commission etc) */}
+                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
+                  {creditExtras[i] ? <span className="flex items-center gap-1"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{creditExtras[i].name}</span> : ''}
                 </td>
-                <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-600">
-                  {debit[i] ? `-₹${debit[i].amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : ''}
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
+                  {creditExtras[i] ? `${creditExtras[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}` : ''}
+                </td>
+                {/* Debit Col 1 - Merchants */}
+                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
+                  {debit[i] ? <span className="flex items-center gap-1"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{debit[i].name}</span> : ''}
+                </td>
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-600">
+                  {debit[i] ? `-${debit[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}` : ''}
+                </td>
+                {/* Debit Col 2 - Extras (Agent Commission etc) */}
+                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
+                  {debitExtras[i] ? <span className="flex items-center gap-1"><input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />{debitExtras[i].name}</span> : ''}
+                </td>
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-600">
+                  {debitExtras[i] ? `-${debitExtras[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}` : ''}
                 </td>
               </tr>
             ))}
 
-            {/* Totals */}
             <tr className="bg-gray-200 font-bold">
-              <td className="border border-gray-300 px-3 py-2 text-blue-800">Credit / Jama / Dena Total</td>
-              <td className="border border-gray-300 px-3 py-2 text-right text-blue-800">₹{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td className="border border-gray-300 px-3 py-2 text-red-800">Debit / Name / Lena Total</td>
-              <td className="border border-gray-300 px-3 py-2 text-right text-red-800">-₹{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td colSpan={3} className="border border-gray-300 px-3 py-2 text-blue-800">Credit / Jama / Dena Total</td>
+              <td className="border border-gray-300 px-3 py-2 text-right text-blue-800">{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 0 })}</td>
+              <td colSpan={3} className="border border-gray-300 px-3 py-2 text-red-800">Debit / Name / Lena Total</td>
+              <td className="border border-gray-300 px-3 py-2 text-right text-red-800">-{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 0 })}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* Summary */}
       <div className="mt-4 flex flex-wrap gap-4 text-sm">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Total Credit (From Agents):</span>
-          <span className="ml-2 font-bold text-blue-700">₹{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
+        
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Total Debit (To Merchants):</span>
-          <span className="ml-2 font-bold text-red-700">₹{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Balance:</span>
-          <span className={`ml-2 font-bold ${totalCredit - totalDebit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            ₹{(totalCredit - totalDebit).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
+          <div className="text-gray-500 text-xs">Total Lena (INR / AED)</div>
+          <div className="font-bold text-red-700">₹{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div className="text-xs text-red-500 mt-0.5">AED {totalDebitAed.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
         </div>
       </div>
     </div>

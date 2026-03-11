@@ -247,10 +247,10 @@ router.post(
         where: { id: tx.operator.agentId },
       });
       const amt = parseFloat(tx.amount);
-      const mC = (amt * parseFloat(tx.merchant.commissionChargePercent)) / 100;
       const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
       const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-      const adC = mC - aC;
+      const adC = aC;  // admin commission = agent commission
+      const mC = 0;    // merchant commission not used
       await prisma.$transaction(async (pc) => {
         await pc.transaction.update({
           where: { id: txId },
@@ -423,10 +423,10 @@ router.post("/transactions/bulk-clear", bulkUpload.single("file"), async (req, r
       if (!tx) { skipped++; continue; }
       const agent = await prisma.agent.findUnique({ where: { id: tx.operator.agentId } });
       const amt = parseFloat(tx.amount);
-      const mC = (amt * parseFloat(tx.merchant.commissionChargePercent)) / 100;
       const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
       const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-      const adC = mC - aC;
+      const adC = aC;  // admin commission = agent commission
+      const mC = 0;    // merchant commission not used
       await prisma.$transaction(async (pc) => {
         await pc.transaction.update({
           where: { id: tx.id },

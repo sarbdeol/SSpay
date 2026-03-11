@@ -5,7 +5,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { StatCard, DataTable, PageHeader, Button, Modal, FormInput, FormSelect, FormTextarea, Toggle, StatusBadge } from '../../components/common';
 import toast from 'react-hot-toast';
-
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 export function AgentDashboard() {
   const [stats, setStats] = useState(null);
   useEffect(() => { api.get('/agent/dashboard').then(r => setStats(r.data.data)); }, []);
@@ -124,7 +125,8 @@ export function AgentOperatorUsers() {
   const [showEdit, setShowEdit] = useState(null);
   const [form, setForm] = useState({ username: '', password: '', operatorId: '' });
   const [editForm, setEditForm] = useState({ username: '', password: '', operatorId: '', isActive: true });
-
+  const { impersonate } = useAuth();
+  const navigate = useNavigate();
   const fetchData = () => {
     api.get('/agent/operator-users').then(r => setUsers(r.data.data));
     api.get('/agent/operators').then(r => setOperators(r.data.data));
@@ -165,6 +167,8 @@ export function AgentOperatorUsers() {
           <div className="flex gap-1">
             <button onClick={() => { navigator.clipboard.writeText(`Username: ${r.username}\nPassword: ${r.plainPassword || 'N/A'}\nLogin: ${window.location.origin}/login`); toast.success('Credentials copied!'); }}
               className="p-1.5 rounded-lg hover:bg-gray-100" title="Copy Credentials">📋</button>
+            <button onClick={async () => { try { await impersonate(r.id); navigate('/operator'); } catch(e) { toast.error('Failed.'); } }}
+              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500" title="Login as Operator">🔑</button>
             <button onClick={() => handleEditOpen(r)} className="p-1.5 rounded-lg hover:bg-gray-100">✏️</button>
             <button onClick={async () => { await api.delete(`/agent/operator-users/${r.id}`); fetchData(); }}
               className="p-1.5 rounded-lg hover:bg-red-50">🗑️</button>
