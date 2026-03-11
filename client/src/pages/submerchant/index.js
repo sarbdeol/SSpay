@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import html2canvas from "html2canvas";
 import api from "../../utils/api";
 import {
   StatCard,
@@ -11,7 +12,97 @@ import {
   StatusBadge,
 } from "../../components/common";
 import toast from "react-hot-toast";
+function ReceiptImageModal({ transaction, onClose }) {
+  const receiptRef = useRef(null);
+  if (!transaction) return null;
 
+  const handleSaveImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${transaction.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success('Image saved!');
+    } catch (e) { toast.error('Save failed.'); }
+  };
+
+  const handleShare = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], `receipt-${transaction.id}.png`, { type: 'image/png' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: `Receipt #${transaction.id}` });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `receipt-${transaction.id}.png`;
+          a.click();
+          toast.success('Image saved! Share from gallery.');
+        }
+      }, 'image/png');
+    } catch (e) { toast.error('Share failed.'); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div ref={receiptRef}>
+          <div style={{ background: '#1a1a2e', padding: '20px 24px', borderRadius: '16px 16px 0 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>INDU PAY</div>
+                <div style={{ color: '#aeaeb2', fontSize: '12px', marginTop: '2px' }}>Payment Receipt</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: '#fff', fontSize: '13px' }}>#{transaction.id}</div>
+                <div style={{ color: '#34d399', fontSize: '11px', fontWeight: 'bold' }}>{transaction.status}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ background: '#f0fdf4', padding: '16px 24px', textAlign: 'center' }}>
+            <div style={{ color: '#166534', fontSize: '12px' }}>Amount</div>
+            <div style={{ color: '#166534', fontSize: '28px', fontWeight: 'bold' }}>₹{parseFloat(transaction.amount).toLocaleString()}</div>
+          </div>
+          <div style={{ padding: '16px 24px' }}>
+            {[
+              ['Type', transaction.transactionType],
+              ['UPI ID', transaction.upiId || '-'],
+              ['Account', transaction.accountNumber || '-'],
+              ['IFSC', transaction.ifscCode || '-'],
+              ['Holder', transaction.accountHolderName || '-'],
+              ['UTR Number', transaction.utrNumber || '-'],
+              ['Remark', transaction.notes || '-'],
+              ['Created', new Date(transaction.createdAt).toLocaleString()],
+              ['Cleared', transaction.transactionClearTime ? new Date(transaction.transactionClearTime).toLocaleString() : '-'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: '12px' }}>
+                <span style={{ color: '#9ca3af' }}>{label}</span>
+                <span style={{ color: '#1f2937', fontWeight: '600', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: '12px 24px 20px', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>System generated receipt</div>
+            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 INDU PAY</div>
+          </div>
+        </div>
+        <div className="flex gap-2 p-4 border-t border-gray-100">
+          <button onClick={handleSaveImage} className="flex-1 h-11 bg-emerald-500 text-white text-sm font-semibold rounded-xl hover:bg-emerald-600">Save Image</button>
+          <button onClick={handleShare} className="flex-1 h-11 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600">Share</button>
+          <button onClick={onClose} className="h-11 px-4 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 export function SubMerchantDashboard() {
   const [stats, setStats] = useState(null);
   useEffect(() => {
@@ -87,6 +178,7 @@ export function SubMerchantTransactions() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [showReceipt, setShowReceipt] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [remarkFilter, setRemarkFilter] = useState("");
   const [form, setForm] = useState({
@@ -250,19 +342,12 @@ export function SubMerchantTransactions() {
         loading={loading}
         actions={(r) =>
           r.status === "CLEARED" && (
-            <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await api.get(`/reports/receipt/${r.id}`, { responseType: 'json' });
-                      // If your receipt endpoint returns PDF, we'll build an image instead
-                    } catch (e) {}
-                  }}
-                  className="text-emerald-600 text-sm font-medium py-2 px-3 min-h-[40px] bg-emerald-50 rounded-lg hover:bg-emerald-100 inline-flex items-center"
-                >
-                  Receipt
-                </button>
-              </div>
+            <button
+              onClick={() => setShowReceipt(r)}
+              className="text-emerald-600 text-sm font-medium py-2 px-3 min-h-[40px] bg-emerald-50 rounded-lg hover:bg-emerald-100 inline-flex items-center"
+            >
+              Receipt
+            </button>
           )
         }
       />
@@ -337,6 +422,9 @@ export function SubMerchantTransactions() {
           </Button>
         </form>
       </Modal>
+    {showReceipt && <ReceiptImageModal transaction={showReceipt} onClose={() => setShowReceipt(null)} />}
     </div>
   );
 }
+
+
