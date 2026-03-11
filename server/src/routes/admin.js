@@ -246,4 +246,66 @@ router.post('/beneficiary-accounts', async (req, res) => { try { res.status(201)
 router.get('/cash-entries', async (req, res) => { try { res.json({ success: true, data: await prisma.cashEntry.findMany({ where: { adminId: req.user.adminId }, orderBy: { createdAt: 'desc' } }) }); } catch (e) { res.status(500).json({ success: false, message: 'Server error.' }); } });
 router.post('/cash-entries', async (req, res) => { try { res.status(201).json({ success: true, data: await prisma.cashEntry.create({ data: { ...req.body, amount: parseFloat(req.body.amount), adminId: req.user.adminId } }) }); } catch (e) { res.status(500).json({ success: false, message: 'Server error.' }); } });
 
+
+// ═══ TRIAL BALANCE (Credit from Agents, Debit to Merchants) ═══
+router.get('/trial-balance', async (req, res) => {
+  try {
+    const adminId = req.user.adminId;
+    const { startDate, endDate } = req.query;
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate + 'T23:59:59.999Z');
+    const txWhere = { merchant: { adminId }, status: 'CLEARED', ...(startDate || endDate ? { createdAt: dateFilter } : {}) };
+
+    // Credit side: grouped by agent — what agents processed (admin receives from agents)
+    const agentTotals = await prisma.transaction.groupBy({
+      by: ['agentId'],
+      where: txWhere,
+      _sum: { amount: true, agentCommission: true },
+    });
+    const agents = await prisma.agent.findMany({ where: { adminId }, select: { id: true, name: true } });
+    const agentMap = {};
+    agents.forEach(a => { agentMap[a.id] = a.name; });
+
+    const creditEntries = agentTotals.map(a => ({
+      id: a.agentId,
+      name: agentMap[a.agentId] || 'Unknown',
+      amount: parseFloat(a._sum.amount || 0),
+      commission: parseFloat(a._sum.agentCommission || 0),
+    }));
+
+    // Debit side: grouped by merchant — what admin owes to merchants
+    const merchantTotals = await prisma.transaction.groupBy({
+      by: ['merchantId'],
+      where: txWhere,
+      _sum: { amount: true, merchantCommission: true },
+    });
+    const merchants = await prisma.merchant.findMany({ where: { adminId }, select: { id: true, name: true } });
+    const merchantMap = {};
+    merchants.forEach(m => { merchantMap[m.id] = m.name; });
+
+    const debitEntries = merchantTotals.map(m => ({
+      id: m.merchantId,
+      name: merchantMap[m.merchantId] || 'Unknown',
+      amount: parseFloat(m._sum.amount || 0),
+      commission: parseFloat(m._sum.merchantCommission || 0),
+    }));
+
+    const totalCredit = creditEntries.reduce((s, e) => s + e.amount, 0);
+    const totalDebit = debitEntries.reduce((s, e) => s + e.amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        credit: creditEntries,
+        debit: debitEntries,
+        totalCredit,
+        totalDebit,
+      }
+    });
+  } catch (error) {
+    console.error('Trial balance error:', error);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
 module.exports = router;

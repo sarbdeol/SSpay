@@ -6,7 +6,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './pages/auth/Login';
 
 import { SuperAdminDashboard, AdminsList, AllUsersList, LoginHistoryList, ExpenseEntriesView } from './pages/superadmin';
-import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTransactions, AdminConfiguration, AdminCollections, DailyReport, AdminLedger } from './pages/admin';
+import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTransactions, AdminConfiguration, AdminCollections, DailyReport, AdminLedger, AdminTrialBalance } from './pages/admin';
 import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, MerchantSettlements, MerchantConfiguration } from './pages/merchant';
 import { SubMerchantDashboard, SubMerchantLedger, SubMerchantTransactions } from './pages/submerchant';
 import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements } from './pages/agent';
@@ -56,6 +56,7 @@ export default function App() {
           <Route path="/admin/configuration" element={<ProtectedRoute roles={['ADMIN']}><AdminConfiguration /></ProtectedRoute>} />
           <Route path="/admin/collections" element={<ProtectedRoute roles={['ADMIN']}><AdminCollections /></ProtectedRoute>} />
           <Route path="/admin/ledger" element={<ProtectedRoute roles={['ADMIN']}><AdminLedger /></ProtectedRoute>} />
+          <Route path="/admin/trial-balance" element={<ProtectedRoute roles={['ADMIN']}><AdminTrialBalance /></ProtectedRoute>} />
           {/* Merchant */}
           <Route path="/merchant" element={<ProtectedRoute roles={['MERCHANT']}><MerchantDashboard /></ProtectedRoute>} />
           <Route path="/merchant/daily-report" element={<ProtectedRoute roles={['MERCHANT']}><DailyReport /></ProtectedRoute>} />

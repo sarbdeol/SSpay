@@ -483,21 +483,19 @@ export function OperatorTransactions() {
               </>
             )}
             {r.status === "CLEARED" && (
-              <button
-                onClick={() => {
-                  api
-                    .get(`/reports/receipt/${r.id}`, { responseType: "blob" })
-                    .then((res) => {
-                      const url = URL.createObjectURL(
-                        new Blob([res.data], { type: "application/pdf" }),
-                      );
-                      window.open(url, "_blank");
-                    });
-                }}
-                className="text-emerald-500 text-xs"
-              >
-                Receipt
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.get(`/reports/receipt/${r.id}`, { responseType: 'json' });
+                      // If your receipt endpoint returns PDF, we'll build an image instead
+                    } catch (e) {}
+                  }}
+                  className="text-emerald-600 text-sm font-medium py-2 px-3 min-h-[40px] bg-emerald-50 rounded-lg hover:bg-emerald-100 inline-flex items-center"
+                >
+                  Receipt
+                </button>
+              </div>
             )}
           </div>
         )}

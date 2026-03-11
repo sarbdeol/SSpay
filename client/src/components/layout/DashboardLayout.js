@@ -20,6 +20,7 @@ const MENUS = {
     { label: 'Collectors', icon: HiOutlineCash, path: '/admin/collectors' },
     { label: 'Expense Managers', icon: HiOutlineDocumentText, path: '/admin/expense-managers' },
     { label: 'Ledger', icon: HiOutlineDocumentText, path: '/admin/ledger' },
+    { label: 'Trial Balance', icon: HiOutlineCash, path: '/admin/trial-balance' },
     { label: 'Others', icon: HiOutlineFolder, children: [
       { label: 'Transactions', path: '/admin/transactions' },
       { label: 'Collection', path: '/admin/collections' },
