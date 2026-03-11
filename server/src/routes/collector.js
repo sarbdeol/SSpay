@@ -8,7 +8,7 @@ router.get('/dashboard', async (req, res) => {
     const collectorId = req.user.collectorId;
     const [merchantOwed, settled, agentKoDena, adminKoDena] = await Promise.all([
       prisma.settlement.aggregate({ where: { collectorId, status: 'PENDING' }, _sum: { amount: true } }),
-      prisma.settlement.aggregate({ where: { collectorId, status: 'APPROVED' }, _sum: { amount: true } }),
+      prisma.settlement.aggregate({ where: { collectorId, status: 'SUBMITTED' }, _sum: { amount: true } }),
       prisma.settlement.aggregate({ where: { collectorId, status: 'PENDING', agentId: { not: null } }, _sum: { amount: true } }),
       prisma.settlement.aggregate({ where: { collectorId, status: 'PENDING', agentId: null }, _sum: { amount: true } }),
     ]);
@@ -33,6 +33,7 @@ router.get('/ledger', async (req, res) => {
 
 // ─── Settlements ───
 router.get('/settlements', async (req, res) => {
+  console.log('collector settlements hit', req.user.collectorId);
   try {
     const data = await prisma.settlement.findMany({
       where: { status: 'PENDING' },
