@@ -286,23 +286,131 @@ export function AgentTransactions() {
 
 // ═══ AGENT LEDGER ═══
 export function AgentLedger() {
-  const [data, setData] = useState([]);
-  useEffect(() => { api.get('/agent/ledger').then(r => setData(r.data.data)); }, []);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const today = new Date().toISOString().split("T")[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [rates, setRates] = useState({ aedTodayRate: 1, usdtTodayRate: 1 });
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api.get("/agent/ledger", { params: { startDate: selectedDate, endDate: selectedDate } }),
+      api.get("/config/current-rates"),
+    ]).then(([txRes, rateRes]) => {
+      setTransactions(txRes.data.data || []);
+      const r = rateRes.data.data?.[0];
+      if (r) setRates({ aedTodayRate: parseFloat(r.aedTodayRate || 1), usdtTodayRate: parseFloat(r.usdtTodayRate || 1) });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [selectedDate]);
+
+  const groupByOperator = () => {
+    const groups = {};
+    transactions.forEach((tx) => {
+      const opName = tx.operator?.name || 'No Operator';
+      if (!groups[opName]) groups[opName] = { operatorName: opName, totalINR: 0, totalCommission: 0 };
+      groups[opName].totalINR += parseFloat(tx.amount);
+      groups[opName].totalCommission += parseFloat(tx.agentCommission || 0);
+    });
+    return groups;
+  };
+
+  const operatorGroups = groupByOperator();
+  const { aedTodayRate, usdtTodayRate } = rates;
+  const toAed = (inr) => aedTodayRate > 0 ? inr / aedTodayRate : 0;
+  const toUsdt = (inr) => usdtTodayRate > 0 ? inr / usdtTodayRate : 0;
+  const grandINR = Object.values(operatorGroups).reduce((s, g) => s + g.totalINR, 0);
+  const grandCommission = Object.values(operatorGroups).reduce((s, g) => s + g.totalCommission, 0);
+  const grandBalance = grandINR - grandCommission;
+  const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
+
   return (
     <div>
-      <PageHeader title="Ledger" subtitle="All cleared transaction records" />
-      <DataTable columns={[
-        { header: 'Txn ID', key: 'id' },
-        { header: 'Amount', render: r => `₹${parseFloat(r.amount).toLocaleString()}` },
-        { header: 'Commission', render: r => `₹${parseFloat(r.agentCommission || 0).toLocaleString()}` },
-        { header: 'Merchant', render: r => r.merchant?.name || '-' },
-        { header: 'Operator', render: r => r.operator?.name || '-' },
-        { header: 'Cleared Date', render: r => r.transactionClearTime ? new Date(r.transactionClearTime).toLocaleString() : '-' },
-      ]} data={data} total={data.length} page={1} />
+      <div className="flex items-center justify-between mb-4">
+        <PageHeader title="Agent Collection Ledger" />
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+        </div>
+      </div>
+
+      <div className="bg-brand-500 text-white text-center py-3 rounded-t-xl font-bold text-lg">
+        AGENT DAILY COLLECTION ({new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")})
+      </div>
+
+      <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-brand-50">
+              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">SR.</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">OPERATOR</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">TOTAL AMOUNT (INR)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">COMMISSION (INR)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">LENA BALANCE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.keys(operatorGroups).length === 0 ? (
+              <tr><td colSpan={5} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No cleared transactions for this date.</td></tr>
+            ) : (
+              Object.values(operatorGroups).map((group, idx) => {
+                const balance = group.totalINR - group.totalCommission;
+                return (
+                  <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-gray-500">{idx + 1}</td>
+                    <td className="border border-gray-200 px-3 py-2 font-semibold text-gray-800">{group.operatorName.toUpperCase()}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-right font-medium">₹{fmt(group.totalINR)}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-right text-red-600 font-medium">₹{fmt(group.totalCommission)}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-right">
+                      <div className="font-semibold text-green-600">₹{fmt(balance)}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">AED {fmt(toAed(balance))} | USDT {fmt(toUsdt(balance))}</div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+            <tr className="bg-brand-500 text-white font-bold">
+              <td className="border border-gray-300 px-3 py-2 text-center" colSpan={2}>TOTAL</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandINR)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandCommission)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                <div>₹{fmt(grandBalance)}</div>
+                <div className="text-xs font-normal mt-0.5 opacity-90">AED {fmt(toAed(grandBalance))} | USDT {fmt(toUsdt(grandBalance))}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-4 text-sm">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Total INR:</span>
+          <span className="ml-2 font-bold text-gray-800">₹{fmt(grandINR)}</span>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Commission:</span>
+          <span className="ml-2 font-bold text-red-700">₹{fmt(grandCommission)}</span>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Lena Balance:</span>
+          <span className="ml-2 font-bold text-green-600">₹{fmt(grandBalance)}</span>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">In AED:</span>
+          <span className="ml-2 font-bold text-green-700">{fmt(toAed(grandBalance))}</span>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">In USDT:</span>
+          <span className="ml-2 font-bold text-purple-700">{fmt(toUsdt(grandBalance))}</span>
+        </div>
+      </div>
     </div>
   );
 }
-
 // ═══ AGENT SETTLEMENTS (with USDT wallet) ═══
 export function AgentSettlements() {
   const [items, setItems] = useState([]);

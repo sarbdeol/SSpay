@@ -26,10 +26,7 @@ router.post('/requests', async (req, res) => {
   catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
 });
 
-router.get('/ledger', async (req, res) => {
-  try { res.json({ success: true, data: await prisma.ledger.findMany({ where: { collectorId: req.user.collectorId }, orderBy: { createdAt: 'desc' } }) }); }
-  catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
-});
+
 
 // ─── Settlements ───
 router.get('/settlements', async (req, res) => {
@@ -127,6 +124,108 @@ router.post('/settlements/:id/pay', async (req, res) => {
       data: { status: 'PAID' }
     });
     res.json({ success: true, data: updated });
+  } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+
+
+router.get('/ledger', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    // Get collector's adminId
+    const collector = await prisma.collector.findUnique({
+      where: { id: req.user.collectorId },
+      select: { adminId: true }
+    });
+
+    // Get all merchants under same admin
+    const merchants = await prisma.merchant.findMany({
+      where: { adminId: collector.adminId },
+      select: { id: true }
+    });
+    const merchantIds = merchants.map(m => m.id);
+
+    // Get cleared transactions for those merchants
+    const where = { merchantId: { in: merchantIds }, status: 'CLEARED' };
+    if (startDate || endDate) {
+      where.transactionClearTime = {};
+      if (startDate) where.transactionClearTime.gte = new Date(startDate);
+      if (endDate) where.transactionClearTime.lte = new Date(endDate + 'T23:59:59.999Z');
+    }
+
+    const data = await prisma.transaction.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        accountHolderName: true,
+        ifscCode: true,
+        utrNumber: true,
+        notes: true,
+        transactionClearTime: true,
+        createdAt: true,
+        merchant: { select: { name: true } },
+        operator: { select: { name: true } },
+      },
+      orderBy: { transactionClearTime: 'desc' },
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
+router.get('/trial-balance', async (req, res) => {
+  try {
+    const collectorId = req.user.collectorId;
+    const { startDate, endDate } = req.query;
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate + 'T23:59:59.999Z');
+    const dateWhere = startDate || endDate ? { createdAt: dateFilter } : {};
+
+    // Merchant Se Lena = settlements from merchants (PENDING/PICKED/SUBMITTED)
+    const merchantSettlements = await prisma.settlement.findMany({
+      where: { collectorId, merchantId: { not: null }, ...dateWhere },
+      include: { merchant: { select: { name: true } } },
+    });
+
+    // Agent Ko Dena = settlements to agents
+    const agentSettlements = await prisma.settlement.findMany({
+      where: { collectorId, agentId: { not: null }, ...dateWhere },
+      include: { agent: { select: { name: true } } },
+    });
+
+    // Group merchants
+    const merchantMap = {};
+    merchantSettlements.forEach(s => {
+      const name = s.merchant?.name || 'Unknown';
+      if (!merchantMap[name]) merchantMap[name] = { name, amount: 0 };
+      if (!['REJECTED'].includes(s.status)) merchantMap[name].amount += parseFloat(s.amount);
+    });
+
+    // Group agents
+    const agentMap = {};
+    agentSettlements.forEach(s => {
+      const name = s.agent?.name || 'Unknown';
+      if (!agentMap[name]) agentMap[name] = { name, amount: 0 };
+      if (!['REJECTED'].includes(s.status)) agentMap[name].amount += parseFloat(s.amount);
+    });
+
+    const totalMerchantLena = Object.values(merchantMap).reduce((s, e) => s + e.amount, 0);
+    const totalAgentDena = Object.values(agentMap).reduce((s, e) => s + e.amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        merchantLena: Object.values(merchantMap),
+        agentDena: Object.values(agentMap),
+        totalMerchantLena,
+        totalAgentDena,
+      }
+    });
   } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
 });
 module.exports = router;

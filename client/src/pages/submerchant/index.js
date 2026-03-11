@@ -141,46 +141,110 @@ export function SubMerchantDashboard() {
 }
 
 export function SubMerchantLedger() {
-  const [items, setItems] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [rates, setRates] = useState({ aedTodayRate: 1 });
+  const [loading, setLoading] = useState(true);
+  const today = new Date().toISOString().split("T")[0];
+  const [selectedDate, setSelectedDate] = useState(today);
 
   useEffect(() => {
-    api.get("/submerchant/ledger").then((r) => setItems(r.data.data));
-    api.get("/submerchant/transactions?limit=100").then((r) => setTransactions(r.data.data || []));
-  }, []);
+    setLoading(true);
+    Promise.all([
+      api.get("/submerchant/transactions", { params: { status: "CLEARED", startDate: selectedDate, endDate: selectedDate, limit: 1000 } }),
+      api.get("/config/current-rates"),
+    ]).then(([txRes, rateRes]) => {
+      setTransactions(txRes.data.data || []);
+      const r = rateRes.data.data?.[0];
+      if (r) setRates({ aedTodayRate: parseFloat(r.aedTodayRate || 1) });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [selectedDate]);
 
-  // If no ledger entries, show transactions as ledger
-  const ledgerData = items.length > 0 ? items : transactions.map((tx, i) => ({
-    entryType: tx.status === 'CLEARED' ? 'CLEARED' : tx.status === 'REJECTED' ? 'REJECTED' : 'PENDING',
-    amount: tx.amount,
-    description: `#${tx.id} ${tx.transactionType} - ${tx.notes || 'No remark'} - UTR: ${tx.utrNumber || 'N/A'}`,
-    balanceAfter: transactions.slice(0, i + 1).filter(t => t.status !== 'REJECTED').reduce((s, t) => s + parseFloat(t.amount), 0),
-    createdAt: tx.createdAt,
-    status: tx.status,
-  }));
+  const { aedTodayRate } = rates;
+  const toAed = (inr) => aedTodayRate > 0 ? inr / aedTodayRate : 0;
+  const fmt = (n) => parseFloat(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const grandINR = transactions.reduce((s, tx) => s + parseFloat(tx.amount), 0);
+  const grandAED = toAed(grandINR);
+
+  if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
   return (
     <div>
-      <PageHeader title="All Ledger" />
-      <DataTable
-        columns={[
-          { header: "Type", render: (r) => (
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-              r.entryType === 'CLEARED' || r.entryType === 'CREDIT' ? 'bg-green-100 text-green-700' :
-              r.entryType === 'REJECTED' ? 'bg-red-100 text-red-700' :
-              r.entryType === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-              'bg-blue-100 text-blue-700'
-            }`}>{r.entryType || r.status || '-'}</span>
-          )},
-          { header: "Amount", render: (r) => `₹${parseFloat(r.amount).toLocaleString()}` },
-          { header: "Description", render: (r) => <span className="text-xs">{r.description || "-"}</span> },
-          { header: "Running Balance", render: (r) => `₹${parseFloat(r.balanceAfter || 0).toLocaleString()}` },
-          { header: "Date", render: (r) => new Date(r.createdAt).toLocaleString() },
-        ]}
-        data={ledgerData}
-        total={ledgerData.length}
-        page={1}
-      />
+      <div className="flex items-center justify-between mb-4">
+        <PageHeader title="Ledger" />
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+        </div>
+      </div>
+
+      <div className="bg-brand-500 text-white text-center py-3 rounded-t-xl font-bold text-lg">
+        DAILY LEDGER ({new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")})
+      </div>
+
+      <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-brand-50">
+              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">SR.</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">NAME</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">A/C NO.</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">IFSC CODE</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">UTR</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">RATE</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (INR)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (AED)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.length === 0 ? (
+              <tr><td colSpan={8} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No cleared transactions for this date.</td></tr>
+            ) : (
+              transactions.map((tx, idx) => {
+                const inr = parseFloat(tx.amount);
+                return (
+                  <tr key={tx.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-500">{idx + 1}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-800">{tx.accountHolderName || tx.notes || '-'}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.accountNumber || '-'}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.ifscCode || '-'}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.utrNumber || '-'}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-600">{aedTodayRate}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium">₹{fmt(inr)}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-700">{fmt(toAed(inr))}</td>
+                  </tr>
+                );
+              })
+            )}
+            <tr className="bg-brand-500 text-white font-bold">
+              <td className="border border-gray-300 px-3 py-2 text-center" colSpan={6}>TOTAL</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandINR)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(grandAED)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-4 text-sm">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Total INR:</span>
+          <span className="ml-2 font-bold text-gray-800">₹{fmt(grandINR)}</span>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Total AED:</span>
+          <span className="ml-2 font-bold text-green-700">{fmt(grandAED)}</span>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">AED Rate:</span>
+          <span className="ml-2 font-bold">{aedTodayRate}</span>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Transactions:</span>
+          <span className="ml-2 font-bold">{transactions.length}</span>
+        </div>
+      </div>
     </div>
   );
 }

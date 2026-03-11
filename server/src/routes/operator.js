@@ -103,7 +103,7 @@ router.get("/dashboard", async (req, res) => {
         totalTransferCount: transferAgg._count || 0,
         totalPendingAmount: pendingAgg._sum.amount || 0,
         totalPendingCount: pendingAgg._count || 0,
-        agentCommissionAmount,  // ✅ e.g. 657.505
+        agentCommissionAmount, // ✅ e.g. 657.505
 
         totalPaymentLunga,
         totalAedLunga: aedLunga,
@@ -249,8 +249,8 @@ router.post(
       const amt = parseFloat(tx.amount);
       const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
       const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-      const adC = aC;  // admin commission = agent commission
-      const mC = 0;    // merchant commission not used
+      const adC = aC; // admin commission = agent commission
+      const mC = 0; // merchant commission not used
       await prisma.$transaction(async (pc) => {
         await pc.transaction.update({
           where: { id: txId },
@@ -341,21 +341,41 @@ router.get("/pending-transactions", async (req, res) => {
 router.post("/transactions/bulk-pick", async (req, res) => {
   try {
     const { transactionIds } = req.body;
-    if (!transactionIds?.length) return res.status(400).json({ success: false, message: "No transactions selected." });
+    if (!transactionIds?.length)
+      return res
+        .status(400)
+        .json({ success: false, message: "No transactions selected." });
     const operatorId = req.user.operatorId;
-    const operator = await prisma.operator.findUnique({ where: { id: operatorId } });
+    const operator = await prisma.operator.findUnique({
+      where: { id: operatorId },
+    });
     let picked = 0;
     for (const txId of transactionIds) {
-      const tx = await prisma.transaction.findFirst({ where: { id: parseInt(txId), status: "PENDING" } });
+      const tx = await prisma.transaction.findFirst({
+        where: { id: parseInt(txId), status: "PENDING" },
+      });
       if (!tx) continue;
       await prisma.$transaction(async (pc) => {
-        await pc.transaction.update({ where: { id: tx.id }, data: { status: "PICKED", operatorId, agentId: operator.agentId, operatorPickTime: new Date() } });
-        await pc.operator.update({ where: { id: operatorId }, data: { transactionPicked: { increment: 1 } } });
+        await pc.transaction.update({
+          where: { id: tx.id },
+          data: {
+            status: "PICKED",
+            operatorId,
+            agentId: operator.agentId,
+            operatorPickTime: new Date(),
+          },
+        });
+        await pc.operator.update({
+          where: { id: operatorId },
+          data: { transactionPicked: { increment: 1 } },
+        });
       });
       picked++;
     }
     res.json({ success: true, message: `${picked} transactions picked.` });
-  } catch (error) { res.status(500).json({ success: false, message: "Server error." }); }
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
 });
 
 // ─── Export Picked (for bulk payment) ───
@@ -363,8 +383,11 @@ router.get("/transactions/export-picked", async (req, res) => {
   try {
     const ExcelJS = require("exceljs");
     const transactions = await prisma.transaction.findMany({
-      where: { operatorId: req.user.operatorId, status: { in: ["PICKED", "PAID"] } },
-      orderBy: { createdAt: "asc" }
+      where: {
+        operatorId: req.user.operatorId,
+        status: { in: ["PICKED", "PAID"] },
+      },
+      orderBy: { createdAt: "asc" },
     });
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Picked Transactions");
@@ -381,62 +404,176 @@ router.get("/transactions/export-picked", async (req, res) => {
       { header: "Status", key: "status", width: 10 },
     ];
     sheet.getRow(1).font = { bold: true };
-    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E5EA" } };
-    transactions.forEach(tx => {
+    sheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE5E5EA" },
+    };
+    transactions.forEach((tx) => {
       sheet.addRow({
-        id: tx.id, amount: parseFloat(tx.amount), type: tx.transactionType,
-        upiId: tx.upiId || "", accountNumber: tx.accountNumber || "",
-        ifsc: tx.ifscCode || "", holderName: tx.accountHolderName || "",
-        remark: tx.notes || "", utrNumber: "", status: tx.status,
+        id: tx.id,
+        amount: parseFloat(tx.amount),
+        type: tx.transactionType,
+        upiId: tx.upiId || "",
+        accountNumber: tx.accountNumber || "",
+        ifsc: tx.ifscCode || "",
+        holderName: tx.accountHolderName || "",
+        remark: tx.notes || "",
+        utrNumber: "",
+        status: tx.status,
       });
     });
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=picked-transactions.xlsx");
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=picked-transactions.xlsx",
+    );
     await workbook.xlsx.write(res);
-  } catch (error) { console.error("Export:", error); res.status(500).json({ success: false, message: "Server error." }); }
+  } catch (error) {
+    console.error("Export:", error);
+    res.status(500).json({ success: false, message: "Server error." });
+  }
 });
 
 // ─── Bulk Clear (upload Excel with UTR filled) ───
 const bulkUpload = multer({ storage: multer.memoryStorage() });
-router.post("/transactions/bulk-clear", bulkUpload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ success: false, message: "File required." });
-    const ExcelJS = require("exceljs");
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(req.file.buffer);
-    const sheet = workbook.worksheets[0];
-    let cleared = 0, skipped = 0;
-    const rows = [];
-    sheet.eachRow((row, idx) => {
-      if (idx === 1) return;
-      rows.push({
-        id: parseInt(row.getCell(1).value),
-        utrNumber: row.getCell(9).value?.toString()?.trim(),
-      });
-    });
-    for (const row of rows) {
-      if (!row.id || !row.utrNumber) { skipped++; continue; }
-      const tx = await prisma.transaction.findFirst({
-        where: { id: row.id, operatorId: req.user.operatorId, status: { in: ["PICKED", "PAID"] } },
-        include: { merchant: { select: { commissionChargePercent: true } }, operator: { select: { commissionChargePercent: true, agentId: true } } }
-      });
-      if (!tx) { skipped++; continue; }
-      const agent = await prisma.agent.findUnique({ where: { id: tx.operator.agentId } });
-      const amt = parseFloat(tx.amount);
-      const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
-      const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-      const adC = aC;  // admin commission = agent commission
-      const mC = 0;    // merchant commission not used
-      await prisma.$transaction(async (pc) => {
-        await pc.transaction.update({
-          where: { id: tx.id },
-          data: { status: "CLEARED", utrNumber: row.utrNumber, transactionClearTime: new Date(), merchantCommission: mC, agentCommission: aC, operatorCommission: oC, adminCommission: adC > 0 ? adC : 0 }
+router.post(
+  "/transactions/bulk-clear",
+  bulkUpload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file)
+        return res
+          .status(400)
+          .json({ success: false, message: "File required." });
+      const ExcelJS = require("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const sheet = workbook.worksheets[0];
+      let cleared = 0,
+        skipped = 0;
+      const rows = [];
+      sheet.eachRow((row, idx) => {
+        if (idx === 1) return;
+        rows.push({
+          id: parseInt(row.getCell(1).value),
+          utrNumber: row.getCell(9).value?.toString()?.trim(),
         });
-        await pc.operator.update({ where: { id: req.user.operatorId }, data: { transactionPicked: { decrement: 1 } } });
       });
-      cleared++;
+      for (const row of rows) {
+        if (!row.id || !row.utrNumber) {
+          skipped++;
+          continue;
+        }
+        const tx = await prisma.transaction.findFirst({
+          where: {
+            id: row.id,
+            operatorId: req.user.operatorId,
+            status: { in: ["PICKED", "PAID"] },
+          },
+          include: {
+            merchant: { select: { commissionChargePercent: true } },
+            operator: {
+              select: { commissionChargePercent: true, agentId: true },
+            },
+          },
+        });
+        if (!tx) {
+          skipped++;
+          continue;
+        }
+        const agent = await prisma.agent.findUnique({
+          where: { id: tx.operator.agentId },
+        });
+        const amt = parseFloat(tx.amount);
+        const aC =
+          (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
+        const oC =
+          (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
+        const adC = aC; // admin commission = agent commission
+        const mC = 0; // merchant commission not used
+        await prisma.$transaction(async (pc) => {
+          await pc.transaction.update({
+            where: { id: tx.id },
+            data: {
+              status: "CLEARED",
+              utrNumber: row.utrNumber,
+              transactionClearTime: new Date(),
+              merchantCommission: mC,
+              agentCommission: aC,
+              operatorCommission: oC,
+              adminCommission: adC > 0 ? adC : 0,
+            },
+          });
+          await pc.operator.update({
+            where: { id: req.user.operatorId },
+            data: { transactionPicked: { decrement: 1 } },
+          });
+        });
+        cleared++;
+      }
+      res.json({
+        success: true,
+        message: `${cleared} cleared, ${skipped} skipped.`,
+      });
+    } catch (error) {
+      console.error("Bulk clear:", error);
+      res.status(500).json({ success: false, message: "Server error." });
     }
-    res.json({ success: true, message: `${cleared} cleared, ${skipped} skipped.` });
-  } catch (error) { console.error("Bulk clear:", error); res.status(500).json({ success: false, message: "Server error." }); }
+  },
+);
+
+router.get("/ledger", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const where = { operatorId: req.user.operatorId, status: "CLEARED" };
+    if (startDate || endDate) {
+      where.AND = [
+        {
+          OR: [
+            {
+              transactionClearTime: {
+                ...(startDate ? { gte: new Date(startDate) } : {}),
+                ...(endDate
+                  ? { lte: new Date(endDate + "T23:59:59.999Z") }
+                  : {}),
+              },
+            },
+            {
+              transactionClearTime: null,
+              createdAt: {
+                ...(startDate ? { gte: new Date(startDate) } : {}),
+                ...(endDate
+                  ? { lte: new Date(endDate + "T23:59:59.999Z") }
+                  : {}),
+              },
+            },
+          ],
+        },
+      ];
+    }
+    const data = await prisma.transaction.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        accountHolderName: true,
+        accountNumber: true,
+        ifscCode: true,
+        utrNumber: true,
+        notes: true,
+        transactionClearTime: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("LEDGER ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 module.exports = router;

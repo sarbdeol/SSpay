@@ -39,7 +39,7 @@ const MENUS = {
   ],
   SUB_MERCHANT: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/submerchant' },
-    { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/submerchant/daily-report' },
+    // { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/submerchant/daily-report' },
     { label: 'Ledger', icon: HiOutlineDocumentText, path: '/submerchant/ledger' },
     { label: 'Configurations', icon: HiOutlineCog, children: [{ label: 'Transactions', path: '/submerchant/transactions' }] },
   ],
@@ -56,12 +56,14 @@ const MENUS = {
   ],
   OPERATOR: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/operator' },
-    { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/operator/daily-report' },
+    // { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/operator/daily-report' },
+    { label: 'Ledger', icon: HiOutlineDocumentText, path: '/operator/ledger' },
     { label: 'Transactions', icon: HiOutlineClipboardList, path: '/operator/transactions' },
   ],
   COLLECTOR: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/collector' },
     { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/collector/daily-report' },
+    { label: 'Trial Balance', icon: HiOutlineCash, path: '/collector/trial-balance' },
     { label: 'Configuration', icon: HiOutlineCog, children: [
       { label: 'Settlements', path: '/collector/settlements' },
       { label: 'Ledger', path: '/collector/ledger' },

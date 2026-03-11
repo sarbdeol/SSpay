@@ -10,8 +10,8 @@ import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTran
 import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, MerchantSettlements, MerchantConfiguration } from './pages/merchant';
 import { SubMerchantDashboard, SubMerchantLedger, SubMerchantTransactions } from './pages/submerchant';
 import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements } from './pages/agent';
-import { OperatorDashboard, OperatorTransactions } from './pages/operator';
-import { CollectorDashboard, CollectorRequests, CollectorLedger ,CollectorSettlements  } from './pages/collector';
+import { OperatorDashboard, OperatorTransactions,OperatorLedger  } from './pages/operator';
+import { CollectorDashboard, CollectorRequests, CollectorLedger ,CollectorSettlements ,CollectorTrialBalance } from './pages/collector';
 import { ExpenseManagerDashboard, ExpenseManagerEntries } from './pages/expense-manager';
 
 function ProtectedRoute({ children, roles }) {
@@ -84,12 +84,15 @@ export default function App() {
           <Route path="/operator" element={<ProtectedRoute roles={['OPERATOR']}><OperatorDashboard /></ProtectedRoute>} />
           <Route path="/operator/daily-report" element={<ProtectedRoute roles={['OPERATOR']}><DailyReport /></ProtectedRoute>} />
           <Route path="/operator/transactions" element={<ProtectedRoute roles={['OPERATOR']}><OperatorTransactions /></ProtectedRoute>} />
+          <Route path="/operator/ledger" element={<ProtectedRoute roles={['OPERATOR']}><OperatorLedger /></ProtectedRoute>} />
+
 
           {/* Collector */}
           <Route path="/collector" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorDashboard /></ProtectedRoute>} />
           <Route path="/collector/daily-report" element={<ProtectedRoute roles={['COLLECTOR']}><DailyReport /></ProtectedRoute>} />
           <Route path="/collector/requests" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorRequests /></ProtectedRoute>} />
           <Route path="/collector/settlements" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorSettlements /></ProtectedRoute>} />
+          <Route path="/collector/trial-balance" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorTrialBalance /></ProtectedRoute>} />
           <Route path="/collector/ledger" element={<ProtectedRoute roles={['COLLECTOR']}><CollectorLedger /></ProtectedRoute>} />
 
           {/* Expense Manager */}

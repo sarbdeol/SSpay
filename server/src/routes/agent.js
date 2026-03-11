@@ -104,8 +104,19 @@ router.get("/dashboard", async (req, res) => {
     const confirmedUsdtAmount = parseFloat(confirmedUsdt._sum.amount || 0);
 
     // Convert confirmed AED/USDT to INR to subtract from totalPaymentLunga
-    const totalPaymentLunga =
-      payOutAmount - parseFloat(commAgg._sum.agentCommission || 0);
+    const agentCommission = parseFloat(commAgg._sum.agentCommission || 0);
+
+    // Agent net commission = operator commission - agent commission
+    const operatorCommAgg = await prisma.transaction.aggregate({
+      where: { ...txWhere, status: "CLEARED" },
+      _sum: { operatorCommission: true },
+    });
+    const operatorCommission = parseFloat(
+      operatorCommAgg._sum.operatorCommission || 0,
+    );
+    const netAgentCommission = operatorCommission - agentCommission;
+
+    const totalPaymentLunga = payOutAmount - agentCommission;
 
     const payOutInAed =
       aedRate > 0
@@ -129,7 +140,7 @@ router.get("/dashboard", async (req, res) => {
     res.json({
       success: true,
       data: {
-        totalAgentCommission: commAgg._sum.agentCommission || 0,
+        totalAgentCommission: netAgentCommission,
         totalPayOutAmount: payOutAmount,
         totalPayOutTransactions: payOutCount,
         totalPendingTransactions: pendingCount,
@@ -382,9 +393,11 @@ router.get("/transactions", async (req, res) => {
     if (operatorId) where.operatorId = parseInt(operatorId);
     if (remark) where.notes = { contains: remark, mode: "insensitive" };
     if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate + "T23:59:59.999Z");
+      const dateField =
+        status === "CLEARED" ? "transactionClearTime" : "createdAt";
+      where[dateField] = {};
+      if (startDate) where[dateField].gte = new Date(startDate);
+      if (endDate) where[dateField].lte = new Date(endDate + "T23:59:59.999Z");
     }
     if (search) {
       where.OR = [
@@ -421,13 +434,21 @@ router.get("/transactions", async (req, res) => {
 // ═══ Ledger ═══
 router.get("/ledger", async (req, res) => {
   try {
-    // Agent ledger = all cleared transactions as ledger entries
+    const { startDate, endDate } = req.query;
+    const where = { agentId: req.user.agentId, status: "CLEARED" };
+    if (startDate || endDate) {
+      where.transactionClearTime = {};
+      if (startDate) where.transactionClearTime.gte = new Date(startDate);
+      if (endDate)
+        where.transactionClearTime.lte = new Date(endDate + "T23:59:59.999Z");
+    }
     const transactions = await prisma.transaction.findMany({
-      where: { agentId: req.user.agentId, status: "CLEARED" },
+      where,
       select: {
         id: true,
         amount: true,
         agentCommission: true,
+        notes: true,
         transactionClearTime: true,
         merchant: { select: { name: true } },
         operator: { select: { name: true } },
@@ -439,7 +460,6 @@ router.get("/ledger", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
-
 // ═══ Settlements ═══
 router.get("/settlements", async (req, res) => {
   try {
