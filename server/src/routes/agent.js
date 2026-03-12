@@ -25,16 +25,39 @@ router.get("/dashboard", async (req, res) => {
     };
 
     const [
-  commAgg, payOutAgg, payOutCount, pendingCount, pendingAmt, clearedAmt, adminCommAgg,
-] = await Promise.all([
-  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { agentCommission: true } }),
-  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { amount: true } }),
-  prisma.transaction.count({ where: { ...txWhere, status: "CLEARED" } }),
-  prisma.transaction.count({ where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } } }),
-  prisma.transaction.aggregate({ where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } }, _sum: { amount: true } }),
-  prisma.transaction.aggregate({ where: { agentId, status: "CLEARED" }, _sum: { amount: true } }),
-  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { adminCommission: true } }),
-]);
+      commAgg,
+      payOutAgg,
+      payOutCount,
+      pendingCount,
+      pendingAmt,
+      clearedAmt,
+      adminCommAgg,
+    ] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: "CLEARED" },
+        _sum: { agentCommission: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: "CLEARED" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.count({ where: { ...txWhere, status: "CLEARED" } }),
+      prisma.transaction.count({
+        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { agentId, status: "CLEARED" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...txWhere, status: "CLEARED" },
+        _sum: { adminCommission: true },
+      }),
+    ]);
 
     // Available limit = SUM of assigned merchants' (maxPaymentLimit - usedLimit)
     const assigned = await prisma.merchantAgent.findMany({
@@ -126,7 +149,9 @@ router.get("/dashboard", async (req, res) => {
         payOutInUsdt,
         confirmedSettlementAed: confirmedAedAmount,
         confirmedSettlementUsdt: confirmedUsdtAmount,
-        totalAdminCommission: parseFloat(adminCommAgg._sum.adminCommission || 0),
+        totalAdminCommission: parseFloat(
+          adminCommAgg._sum.adminCommission || 0,
+        ),
       },
     });
   } catch (error) {
@@ -308,6 +333,7 @@ router.post("/operator-users", async (req, res) => {
         name: username,
         username: username.toLowerCase().trim(),
         password: hashed,
+        plainPassword: password,  // ← ADD
         role: "OPERATOR",
         operatorId: parseInt(operatorId),
         createdBy: req.user.id,
@@ -330,7 +356,10 @@ router.put("/operator-users/:id", async (req, res) => {
       data.username = username.toLowerCase().trim();
       data.name = username;
     }
-    if (password) data.password = await bcrypt.hash(password, 10);
+    if (password) {
+      data.password = await bcrypt.hash(password, 10);
+      data.plainPassword = password;  // ← ADD
+    }
     if (operatorId) data.operatorId = parseInt(operatorId);
     if (typeof isActive === "boolean") data.isActive = isActive;
     await prisma.user.update({ where: { id: parseInt(req.params.id) }, data });
@@ -453,20 +482,18 @@ router.get("/wallet-profile", async (req, res) => {
   }
 });
 
-
-
 // ═══ Settlements ═══
 router.get("/settlements", async (req, res) => {
   try {
     const data = await prisma.settlement.findMany({
-  where: { agentId: req.user.agentId },
-  include: {
-    merchant: { select: { name: true } },
-    collector: { select: { name: true } },
-  },
-  orderBy: { createdAt: "desc" },
-  // payScreenshot and payRemark are regular columns, already returned automatically
-});
+      where: { agentId: req.user.agentId },
+      include: {
+        merchant: { select: { name: true } },
+        collector: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      // payScreenshot and payRemark are regular columns, already returned automatically
+    });
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error." });
@@ -521,33 +548,43 @@ router.post("/settlements/:id/pick", async (req, res) => {
 });
 
 // Update submit to also save remark
-router.post("/settlements/:id/submit", upload.single("qrImage"), async (req, res) => {
-  try {
-    const settlement = await prisma.settlement.findUnique({
-      where: { id: parseInt(req.params.id) },
-    });
-    if (!settlement)
-      return res.status(404).json({ success: false, message: "Not found." });
-    if (settlement.agentId !== req.user.agentId)
-      return res.status(403).json({ success: false, message: "Not your settlement." });
-    if (settlement.status !== "PICKED")
-      return res.status(400).json({ success: false, message: "Must be picked first." });
+router.post(
+  "/settlements/:id/submit",
+  upload.single("qrImage"),
+  async (req, res) => {
+    try {
+      const settlement = await prisma.settlement.findUnique({
+        where: { id: parseInt(req.params.id) },
+      });
+      if (!settlement)
+        return res.status(404).json({ success: false, message: "Not found." });
+      if (settlement.agentId !== req.user.agentId)
+        return res
+          .status(403)
+          .json({ success: false, message: "Not your settlement." });
+      if (settlement.status !== "PICKED")
+        return res
+          .status(400)
+          .json({ success: false, message: "Must be picked first." });
 
-    const { walletAddress, remark, existingQrImage } = req.body;
-    const updated = await prisma.settlement.update({
-      where: { id: parseInt(req.params.id) },
-      data: {
-        status: "SUBMITTED",
-        walletAddress: walletAddress || null,
-        remark: remark || settlement.remark || null,
-        proofImage: req.file ? req.file.filename : (existingQrImage || settlement.proofImage),
-      },
-    });
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server error." });
-  }
-});
+      const { walletAddress, remark, existingQrImage } = req.body;
+      const updated = await prisma.settlement.update({
+        where: { id: parseInt(req.params.id) },
+        data: {
+          status: "SUBMITTED",
+          walletAddress: walletAddress || null,
+          remark: remark || settlement.remark || null,
+          proofImage: req.file
+            ? req.file.filename
+            : existingQrImage || settlement.proofImage,
+        },
+      });
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server error." });
+    }
+  },
+);
 
 router.post("/settlements/:id/reject", async (req, res) => {
   try {
@@ -598,15 +635,22 @@ router.post("/settlements/:id/confirm", async (req, res) => {
   }
 });
 // SAVE wallet profile
-router.post("/settlement-details", upload.single("qrImage"), async (req, res) => {
-  try {
-    const { walletAddress, remark } = req.body;
-    const data = { walletAddress: walletAddress || null, walletRemark: remark || null };
-    if (req.file) data.walletQrImage = req.file.filename;
-    await prisma.agent.update({ where: { id: req.user.agentId }, data });
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server error." });
-  }
-});
+router.post(
+  "/settlement-details",
+  upload.single("qrImage"),
+  async (req, res) => {
+    try {
+      const { walletAddress, remark } = req.body;
+      const data = {
+        walletAddress: walletAddress || null,
+        walletRemark: remark || null,
+      };
+      if (req.file) data.walletQrImage = req.file.filename;
+      await prisma.agent.update({ where: { id: req.user.agentId }, data });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server error." });
+    }
+  },
+);
 module.exports = router;
