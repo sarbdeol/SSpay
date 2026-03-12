@@ -6,8 +6,8 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './pages/auth/Login';
 
 import { SuperAdminDashboard, AdminsList, AllUsersList, LoginHistoryList, ExpenseEntriesView } from './pages/superadmin';
-import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTransactions, AdminConfiguration, AdminCollections, DailyReport, AdminLedger, AdminTrialBalance } from './pages/admin';
-import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, MerchantSettlements, MerchantConfiguration } from './pages/merchant';
+import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTransactions, AdminConfiguration, AdminCollections, DailyReport, AdminLedger, AdminTrialBalance ,AdminExpenseManagers  } from './pages/admin';
+import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, MerchantSettlements, MerchantConfiguration,MerchantLedger  } from './pages/merchant';
 import { SubMerchantDashboard, SubMerchantLedger, SubMerchantTransactions } from './pages/submerchant';
 import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements } from './pages/agent';
 import { OperatorDashboard, OperatorTransactions,OperatorLedger  } from './pages/operator';
@@ -51,7 +51,7 @@ export default function App() {
           <Route path="/admin/merchants" element={<ProtectedRoute roles={['ADMIN']}><AdminMerchants /></ProtectedRoute>} />
           <Route path="/admin/agents" element={<ProtectedRoute roles={['ADMIN']}><AdminAgents /></ProtectedRoute>} />
           <Route path="/admin/collectors" element={<ProtectedRoute roles={['ADMIN']}><AdminCollectors /></ProtectedRoute>} />
-          <Route path="/admin/expense-managers" element={<ProtectedRoute roles={['ADMIN']}><AdminCollectors /></ProtectedRoute>} />
+          <Route path="/admin/expense-managers" element={<ProtectedRoute roles={['ADMIN']}><AdminExpenseManagers /></ProtectedRoute>} />
           <Route path="/admin/transactions" element={<ProtectedRoute roles={['ADMIN']}><AdminTransactions /></ProtectedRoute>} />
           <Route path="/admin/configuration" element={<ProtectedRoute roles={['ADMIN']}><AdminConfiguration /></ProtectedRoute>} />
           <Route path="/admin/collections" element={<ProtectedRoute roles={['ADMIN']}><AdminCollections /></ProtectedRoute>} />
@@ -59,7 +59,7 @@ export default function App() {
           <Route path="/admin/trial-balance" element={<ProtectedRoute roles={['ADMIN']}><AdminTrialBalance /></ProtectedRoute>} />
           {/* Merchant */}
           <Route path="/merchant" element={<ProtectedRoute roles={['MERCHANT']}><MerchantDashboard /></ProtectedRoute>} />
-          <Route path="/merchant/daily-report" element={<ProtectedRoute roles={['MERCHANT']}><DailyReport /></ProtectedRoute>} />
+          <Route path="/merchant/ledger" element={<ProtectedRoute roles={['MERCHANT']}><MerchantLedger /></ProtectedRoute>} />
           <Route path="/merchant/submerchants" element={<ProtectedRoute roles={['MERCHANT']}><MerchantSubmerchants /></ProtectedRoute>} />
           <Route path="/merchant/transactions" element={<ProtectedRoute roles={['MERCHANT']}><MerchantTransactions /></ProtectedRoute>} />
           <Route path="/merchant/configuration" element={<ProtectedRoute roles={['MERCHANT']}><MerchantConfiguration /></ProtectedRoute>} />

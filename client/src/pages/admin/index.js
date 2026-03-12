@@ -54,22 +54,125 @@ export function AdminDashboard() {
           value={stats?.totalRtgsAmount || 0}
           index={0}
         />
+        <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl p-5 text-white shadow-sm">
+          <p className="text-sm font-medium opacity-80 mb-2">
+            Total Lena (from Merchants)
+          </p>
+          <p className="text-xl font-bold">
+            ₹
+            {(stats?.totalLena || 0).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
+            <div className="flex justify-between opacity-90">
+              <span>Total Cleared (INR)</span>
+              <strong>
+                ₹
+                {(stats?.totalRtgsAmount || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+            <div className="flex justify-between opacity-90">
+              <span>Settled (AED)</span>
+              <strong>
+                - AED{" "}
+                {(stats?.merchantSettledAed || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+            {stats?.merchantSettledUsdt > 0 && (
+              <div className="flex justify-between opacity-90">
+                <span>Settled (USDT)</span>
+                <strong>
+                  - USDT{" "}
+                  {stats.merchantSettledUsdt.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </strong>
+              </div>
+            )}
+            <div className="flex justify-between font-bold border-t border-white/20 pt-1">
+              <span>Remaining (INR)</span>
+              <span>
+                ₹
+                {(stats?.totalLena || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl p-5 text-white shadow-sm">
+          <p className="text-sm font-medium opacity-80 mb-2">
+            Total Dena (to Agents)
+          </p>
+          <p className="text-xl font-bold">
+            ₹
+            {(stats?.totalDena || 0).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
+            <div className="flex justify-between opacity-90">
+              <span>Cleared - Commission (INR)</span>
+              <strong>
+                ₹
+                {(
+                  (stats?.totalRtgsAmount || 0) -
+                  (stats?.totalAdminCommission || 0)
+                ).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+            <div className="flex justify-between opacity-90">
+              <span>Settled (AED)</span>
+              <strong>
+                - AED{" "}
+                {(stats?.agentSettledAed || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+            {stats?.agentSettledUsdt > 0 && (
+              <div className="flex justify-between opacity-90">
+                <span>Settled (USDT)</span>
+                <strong>
+                  - USDT{" "}
+                  {stats.agentSettledUsdt.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </strong>
+              </div>
+            )}
+            <div className="flex justify-between font-bold border-t border-white/20 pt-1">
+              <span>Remaining (INR)</span>
+              <span>
+                ₹
+                {(stats?.totalDena || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
         <StatCard
-          title="Pending"
-          value={stats?.totalPending || 0}
-          prefix=""
-          index={1}
-        />
-        <StatCard
-          title="Picked / In Process"
-          value={stats?.totalPicked || 0}
-          prefix=""
-          index={2}
-        />
-        <StatCard
-          title="Cleared"
-          value={stats?.totalCleared || 0}
-          prefix=""
+          title="Admin Commission"
+          value={stats?.totalAdminCommission || 0}
           index={3}
         />
         <StatCard
@@ -83,8 +186,21 @@ export function AdminDashboard() {
           index={5}
         />
         <StatCard
-          title="Admin Commission"
-          value={stats?.totalAdminCommission || 0}
+          title="Pending"
+          value={stats?.totalPending || 0}
+          prefix=""
+          index={6}
+        />
+        <StatCard
+          title="Picked / In Process"
+          value={stats?.totalPicked || 0}
+          prefix=""
+          index={7}
+        />
+        <StatCard
+          title="Cleared"
+          value={stats?.totalCleared || 0}
+          prefix=""
           index={0}
         />
         <StatCard
@@ -92,6 +208,18 @@ export function AdminDashboard() {
           value={stats?.merchantCount || 0}
           prefix=""
           index={1}
+        />
+        <StatCard
+          title="Agents"
+          value={stats?.agentCount || 0}
+          prefix=""
+          index={2}
+        />
+        <StatCard
+          title="Collectors"
+          value={stats?.collectorCount || 0}
+          prefix=""
+          index={3}
         />
       </div>
     </div>
@@ -1662,293 +1790,201 @@ export function AdminBlockedIfsc() {
 // ADMIN LEDGER - Daily Collection
 // ═══════════════════════════════════════════
 export function AdminLedger() {
-  const [transactions, setTransactions] = useState([]);
-  const [merchantRates, setMerchantRates] = useState({});
+  const [merchantLedger, setMerchantLedger] = useState([]);
+  const [agentLedger, setAgentLedger] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const today = new Date().toISOString().split("T")[0];
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [view, setView] = useState("both");
+  const [selectedMerchant, setSelectedMerchant] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.get("/admin/transactions", {
-        params: {
-          status: "CLEARED",
-          startDate: selectedDate,
-          endDate: selectedDate,
-          limit: 1000,
-        },
-      }),
-      api.get("/config/rates"),
-    ])
-      .then(([txRes, rateRes]) => {
-        setTransactions(txRes.data.data || []);
-        const rateMap = {};
-        (rateRes.data.data || []).forEach((r) => {
-          if (r.merchantId)
-            rateMap[r.merchantId] = parseFloat(r.aedTodayRate || 1);
-        });
-        setMerchantRates(rateMap);
+    const params = {};
+    if (selectedDate) { params.startDate = selectedDate; params.endDate = selectedDate; }
+    api.get("/admin/ledger", { params })
+      .then((r) => {
+        setMerchantLedger(r.data.merchantLedger || []);
+        setAgentLedger(r.data.agentLedger || []);
+        setSummary(r.data.summary || null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [selectedDate]);
 
-  const groupByMerchant = () => {
-    const groups = {};
-    transactions.forEach((tx) => {
-      const mName = tx.merchant?.name || "Unknown";
-      if (!groups[mName])
-        groups[mName] = {
-          merchantName: mName,
-          merchantId: tx.merchantId || tx.merchant?.id,
-          remarks: {},
-          totalAmount: 0,
-        };
-      const remark = tx.notes || "No Remark";
-      if (!groups[mName].remarks[remark]) groups[mName].remarks[remark] = 0;
-      groups[mName].remarks[remark] += parseFloat(tx.amount);
-      groups[mName].totalAmount += parseFloat(tx.amount);
-    });
-    return groups;
-  };
+  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const merchantGroups = groupByMerchant();
-  const grandTotal = Object.values(merchantGroups).reduce(
-    (s, g) => s + g.totalAmount,
-    0,
-  );
-  const grandTotalAed = Object.values(merchantGroups).reduce((s, g) => {
-    const mRate = merchantRates[g.merchantId] || 1;
-    return s + (mRate > 0 ? g.totalAmount / mRate : 0);
-  }, 0);
+  const filteredMerchants = merchantLedger.filter((r) => !selectedMerchant || r.name === selectedMerchant);
+  const filteredAgents = agentLedger.filter((r) => !selectedAgent || r.name === selectedAgent);
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
+
+  const LedgerTable = ({ rows, type }) => {
+    const isMerchant = type === "merchant";
+    const grandPending = rows.reduce((s, r) => s + r.pending, 0);
+    const grandPendingAed = rows.reduce((s, r) => s + r.pendingAed, 0);
+    const totalWithComm = grandPending + parseFloat(summary?.totalAdminCommission || 0);
+    const totalWithCommAed = grandPendingAed + parseFloat(summary?.totalAdminCommissionAed || 0);
+
+    return (
+      <div className="mb-6">
+        <div className={`text-white text-center py-2 rounded-t-xl font-bold text-base ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}>
+          {isMerchant ? "Merchant Se Lena" : "Agent Ko Dena"}
+        </div>
+        <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className={isMerchant ? "bg-red-50" : "bg-blue-50"}>
+                <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                  {isMerchant ? "MERCHANT" : "AGENT"}
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">RATE</th>
+                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (INR)</th>
+                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (AED)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No data found.</td>
+                </tr>
+              ) : (
+                rows.map((row, idx) => (
+                  <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">{row.name.toUpperCase()}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">{row.aedRate}</td>
+                    <td className={`border border-gray-200 px-3 py-1.5 text-right font-medium ${isMerchant ? "text-red-600" : "text-blue-600"}`}>
+                      ₹{fmt(row.pending)}
+                    </td>
+                    <td className={`border border-gray-200 px-3 py-1.5 text-right font-medium ${isMerchant ? "text-red-600" : "text-blue-600"}`}>
+                      {fmt(row.pendingAed)}
+                    </td>
+                  </tr>
+                ))
+              )}
+              {!isMerchant && (
+                <tr className="bg-purple-50">
+                  <td className="border border-gray-200 px-3 py-1.5 font-semibold text-purple-700" colSpan={2}>
+                    ADMIN COMMISSION
+                  </td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700">
+                    ₹{fmt(summary?.totalAdminCommission)}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700">
+                    {fmt(summary?.totalAdminCommissionAed)}
+                  </td>
+                </tr>
+              )}
+              <tr className={`text-white font-bold ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}>
+                <td className="border border-gray-300 px-3 py-2" colSpan={2}>TOTAL</td>
+                <td className="border border-gray-300 px-3 py-2 text-right">
+                  ₹{isMerchant ? fmt(grandPending) : fmt(totalWithComm)}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-right">
+                  {isMerchant ? fmt(grandPendingAed) : fmt(totalWithCommAed)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <PageHeader title="Daily Collection Ledger" />
+        <PageHeader title="Collection Ledger" />
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">
-            Select Date
-          </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac"
-          />
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500" />
         </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">View</label>
+          <select value={view} onChange={(e) => setView(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[150px]">
+            <option value="both">Both</option>
+            <option value="merchant">Merchant Se Lena</option>
+            <option value="agent">Agent Ko Dena</option>
+          </select>
+        </div>
+        {(view === "both" || view === "merchant") && (
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Merchant</label>
+            <select value={selectedMerchant} onChange={(e) => setSelectedMerchant(e.target.value)}
+              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[180px]">
+              <option value="">All Merchants</option>
+              {merchantLedger.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
+            </select>
+          </div>
+        )}
+        {(view === "both" || view === "agent") && (
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Agent</label>
+            <select value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)}
+              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[180px]">
+              <option value="">All Agents</option>
+              {agentLedger.map((a) => <option key={a.id} value={a.name}>{a.name}</option>)}
+            </select>
+          </div>
+        )}
+        {selectedDate && (
+          <button onClick={() => setSelectedDate("")} className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Clear Date</button>
+        )}
+        {selectedMerchant && (
+          <button onClick={() => setSelectedMerchant("")} className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Clear Merchant</button>
+        )}
+        {selectedAgent && (
+          <button onClick={() => setSelectedAgent("")} className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Clear Agent</button>
+        )}
       </div>
 
-      <div className="bg-green-500 text-white text-center py-3 rounded-t-xl font-bold text-lg">
-        DAILY COLLECTION (
-        {new Date(selectedDate)
-          .toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "2-digit",
-          })
-          .replace(/\//g, "-")}
-        )
-      </div>
+      {/* Tables */}
+      {(view === "both" || view === "merchant") && <LedgerTable rows={filteredMerchants} type="merchant" />}
+      {(view === "both" || view === "agent") && <LedgerTable rows={filteredAgents} type="agent" />}
 
-      <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-green-100">
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 w-[140px]">
-                PARTY
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700 w-[180px]">
-                GROUP
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[120px]">
-                TODAY AMOUNT (INR)
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[120px]">
-                TODAY AMOUNT (AED)
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[140px]">
-                PREVIOUS OUTSTANDING (AED)
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[120px]">
-                RECEIVED (AED)
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[130px]">
-                OUTSTANDING (AED)
-              </th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-[100px]">
-                LIMIT
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.keys(merchantGroups).length === 0 ? (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="border border-gray-200 px-3 py-6 text-center text-gray-400"
-                >
-                  No cleared transactions for this date.
-                </td>
-              </tr>
-            ) : (
-              Object.values(merchantGroups).map((group, gIdx) => {
-                const remarkEntries = Object.entries(group.remarks);
-                const mRate = merchantRates[group.merchantId] || 1;
-                const todayAed = mRate > 0 ? group.totalAmount / mRate : 0;
-                const outstanding = todayAed;
-                return remarkEntries.map(([remark, amount], rIdx) => (
-                  <tr
-                    key={`${gIdx}-${rIdx}`}
-                    className={gIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                  >
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800 align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        {group.merchantName.toUpperCase()}
-                        <div className="text-xs text-gray-400 font-normal mt-0.5">
-                          Rate: {mRate}
-                        </div>
-                      </td>
-                    )}
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">
-                      {remark}
-                    </td>
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right font-medium align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        ₹
-                        {group.totalAmount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                    )}
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right font-medium align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        {todayAed.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                    )}
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right text-gray-400 align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        -
-                      </td>
-                    )}
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right text-gray-400 align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        -
-                      </td>
-                    )}
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right font-semibold text-red-600 align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        {outstanding.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                    )}
-                    {rIdx === 0 && (
-                      <td
-                        className="border border-gray-200 px-3 py-1.5 text-right text-gray-400 align-top"
-                        rowSpan={remarkEntries.length}
-                      >
-                        -
-                      </td>
-                    )}
-                  </tr>
-                ));
-              })
-            )}
-            <tr>
-              <td
-                colSpan={8}
-                className="border border-gray-200 h-1 bg-gray-100"
-              ></td>
-            </tr>
-            <tr className="bg-green-500 text-white font-bold">
-              <td className="border border-gray-300 px-3 py-2" colSpan={2}>
-                TOTAL
-              </td>
-              <td className="border border-gray-300 px-3 py-2 text-right">
-                ₹
-                {grandTotal.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </td>
-              <td className="border border-gray-300 px-3 py-2 text-right">
-                {grandTotalAed.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </td>
-              <td className="border border-gray-300 px-3 py-2 text-right">-</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">-</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">
-                {grandTotalAed.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </td>
-              <td className="border border-gray-300 px-3 py-2 text-right">-</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-4 text-sm">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Total INR:</span>
-          <span className="ml-2 font-bold text-gray-800">
-            ₹
-            {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
+      {/* Summary Cards */}
+      <div className="mt-2 flex flex-wrap gap-4 text-sm">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Merchant Lena (Pending)</div>
+          <div className="font-bold text-red-700">₹{fmt(summary?.merchantPending)}</div>
+          <div className="text-xs text-red-500 mt-0.5">AED {fmt(summary?.merchantPendingAed)}</div>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Total AED:</span>
-          <span className="ml-2 font-bold text-green-700">
-            {grandTotalAed.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-            })}
-          </span>
+          <div className="text-gray-500 text-xs">Merchant Settled (AED)</div>
+          <div className="font-bold text-green-700">AED {fmt(summary?.merchantSettledAed)}</div>
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Rates:</span>
-          <span className="ml-2 font-bold">Per Merchant</span>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Agent Dena (Pending)</div>
+          <div className="font-bold text-blue-700">₹{fmt(summary?.agentPending)}</div>
+          <div className="text-xs text-blue-500 mt-0.5">AED {fmt(summary?.agentPendingAed)}</div>
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Merchants:</span>
-          <span className="ml-2 font-bold">
-            {Object.keys(merchantGroups).length}
-          </span>
+        <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Admin Commission</div>
+          <div className="font-bold text-purple-700">₹{fmt(summary?.totalAdminCommission)}</div>
+          <div className="text-xs text-purple-500 mt-0.5">AED {fmt(summary?.totalAdminCommissionAed)}</div>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Agent Settled (AED)</div>
+          <div className="font-bold text-green-700">AED {fmt(summary?.agentSettledAed)}</div>
+        </div>
+        <div className={`border rounded-xl px-4 py-3 ${Math.abs((summary?.merchantPending || 0) - (summary?.agentPendingWithComm || 0)) < 1 ? "bg-green-50 border-green-200" : "bg-orange-50 border-orange-200"}`}>
+          <div className="text-gray-500 text-xs">Agent + Commission (= Merchant Lena)</div>
+          <div className={`font-bold ${Math.abs((summary?.merchantPending || 0) - (summary?.agentPendingWithComm || 0)) < 1 ? "text-green-700" : "text-orange-700"}`}>
+            ₹{fmt(summary?.agentPendingWithComm)}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">AED {fmt(summary?.agentPendingWithCommAed)}</div>
         </div>
       </div>
     </div>
   );
 }
-
 // ═══════════════════════════════════════════
 // ADMIN TRIAL BALANCE
 // ═══════════════════════════════════════════
@@ -1958,7 +1994,8 @@ export function AdminTrialBalance() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [search, setSearch] = useState("");
-  const [merchantRates, setMerchantRates] = useState({});
+  const [aedRate, setAedRate] = useState(1);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = {};
@@ -1966,17 +2003,11 @@ export function AdminTrialBalance() {
     if (endDate) params.endDate = endDate;
     const [r, rateRes] = await Promise.all([
       api.get("/admin/trial-balance", { params }),
-      api.get("/config/rates"),
+      api.get("/config/current-rates"),
     ]);
     setData(r.data.data);
-    const rateMap = {};
-    (rateRes.data.data || []).forEach((rt) => {
-      if (rt.merchantId)
-        rateMap[rt.merchantId] = parseFloat(rt.aedTodayRate || 1);
-      if (rt.agentId)
-        rateMap["agent_" + rt.agentId] = parseFloat(rt.aedTodayRate || 1);
-    });
-    setMerchantRates(rateMap);
+    const rt = rateRes.data.data?.[0];
+    if (rt) setAedRate(parseFloat(rt.aedTodayRate || 1));
     setLoading(false);
   }, [startDate, endDate]);
 
@@ -1993,29 +2024,27 @@ export function AdminTrialBalance() {
     (e) => !search || e.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Admin commission (deducted from credit side)
-  const totalAdminComm =
-    data?.totalAdminCommission ||
-    credit.reduce((s, e) => s + (e.commission || 0), 0);
-  const creditExtras = [];
-  if (totalAdminComm > 0)
-    creditExtras.push({ name: "ADMIN COMMISSION", amount: totalAdminComm });
+  const toAed = (inr) => (aedRate > 0 ? inr / aedRate : 0);
+  const fmt = (n) =>
+    parseFloat(n || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  const fmtInt = (n) =>
+    parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0 });
 
-  const debitExtras = [];
+  const adminComm = parseFloat(data?.totalAdminCommission || 0);
+  const totalCredit = credit.reduce(
+    (s, e) => s + (parseFloat(e.pending) || 0),
+    0,
+  );
+  const totalDebit = debit.reduce(
+    (s, e) => s + (parseFloat(e.pending) || 0),
+    0,
+  );
+  const totalCreditWithComm = totalCredit + adminComm;
+  const maxRows = Math.max(credit.length + 1, debit.length, 1);
 
-  // Credit total = agent amounts (no deduction)
-  const totalCredit = credit.reduce((s, e) => s + e.amount, 0);
-  // Debit total = merchant amounts
-  const totalDebit = debit.reduce((s, e) => s + e.amount, 0);
-  const maxCreditRows = Math.max(credit.length, creditExtras.length, 1);
-  const maxDebitRows = Math.max(debit.length, debitExtras.length, 1);
-  const maxRows = Math.max(maxCreditRows, maxDebitRows);
-  // AED conversions
-  const totalDebitAed = credit.reduce((s, e) => {
-    const rate =
-      merchantRates["agent_" + e.id] || Object.values(merchantRates)[0] || 1;
-    return s + (rate > 0 ? e.amount / rate : 0);
-  }, 0);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -2062,160 +2091,96 @@ export function AdminTrialBalance() {
           <thead>
             <tr>
               <th
-                colSpan={4}
+                colSpan={3}
                 className="border border-gray-300 bg-blue-50 px-3 py-2 text-center font-bold text-blue-800"
               >
-                Credit / Jama / Dena
+                Credit / Jama / Dena (Agent Ko Dena)
               </th>
               <th
-                colSpan={4}
+                colSpan={3}
                 className="border border-gray-300 bg-red-50 px-3 py-2 text-center font-bold text-red-800"
               >
-                Debit / Lena
+                Debit / Nama / Lena (Merchant Se Lena)
               </th>
             </tr>
             <tr className="bg-gray-100">
               <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Name
+                Agent
               </th>
               <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (Cr)
+                Amount (INR)
+              </th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
+                Amount (AED)
               </th>
               <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Name
+                Merchant
               </th>
               <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (Cr)
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Name
+                Amount (INR)
               </th>
               <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (Dr)
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Name
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (Dr)
+                Amount (AED)
               </th>
             </tr>
           </thead>
           <tbody>
             {Array.from({ length: maxRows }).map((_, i) => (
               <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                {/* Credit Col 1 - Agents */}
                 <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
-                  {credit[i] ? (
-                    <span className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-gray-300"
-                      />
-                      {credit[i].name}
+                  {i < credit.length ? (
+                    credit[i].name
+                  ) : i === credit.length ? (
+                    <span className="font-semibold text-purple-700">
+                      ADMIN COMMISSION
                     </span>
                   ) : (
                     ""
                   )}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
-                  {credit[i] ? (
-                    <div>
-                      <div>
-                        {(
-                          credit[i].amount - credit[i].commission
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    ""
-                  )}
+                  {i < credit.length
+                    ? fmtInt(credit[i].pending)
+                    : i === credit.length
+                      ? fmtInt(adminComm)
+                      : ""}
                 </td>
-                {/* Credit Col 2 - Extras (Admin Commission etc) */}
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-500">
+                  {i < credit.length
+                    ? fmt(toAed(credit[i].pending))
+                    : i === credit.length
+                      ? fmt(toAed(adminComm))
+                      : ""}
+                </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
-                  {creditExtras[i] ? (
-                    <span className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-gray-300"
-                      />
-                      {creditExtras[i].name}
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                </td>
-                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
-                  {creditExtras[i]
-                    ? `${creditExtras[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
-                    : ""}
-                </td>
-                {/* Debit Col 1 - Merchants */}
-                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
-                  {debit[i] ? (
-                    <span className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-gray-300"
-                      />
-                      {debit[i].name}
-                    </span>
-                  ) : (
-                    ""
-                  )}
+                  {debit[i]?.name || ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-600">
-                  {debit[i]
-                    ? `-${debit[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
-                    : ""}
+                  {debit[i] ? fmtInt(debit[i].pending) : ""}
                 </td>
-                {/* Debit Col 2 - Extras (Agent Commission etc) */}
-                <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
-                  {debitExtras[i] ? (
-                    <span className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-gray-300"
-                      />
-                      {debitExtras[i].name}
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                </td>
-                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-600">
-                  {debitExtras[i]
-                    ? `-${debitExtras[i].amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
-                    : ""}
+                <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-400">
+                  {debit[i] ? fmt(toAed(debit[i].pending)) : ""}
                 </td>
               </tr>
             ))}
-
-            <tr className="bg-gray-200 font-bold">
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-blue-800"
-              >
-                Credit / Jama / Dena Total
+            <tr className="bg-brand-500 text-white font-bold">
+              <td colSpan={2} className="border border-gray-300 px-3 py-2">
+                Total Dena + Commission
               </td>
-              <td className="border border-gray-300 px-3 py-2 text-right text-blue-800">
-                {totalCredit.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                })}
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                <div>{fmtInt(totalCreditWithComm)}</div>
+                <div className="text-xs font-normal opacity-90">
+                  AED {fmt(toAed(totalCreditWithComm))}
+                </div>
               </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-red-800"
-              >
-                Debit / Name / Lena Total
+              <td colSpan={2} className="border border-gray-300 px-3 py-2">
+                Total Lena (Pending)
               </td>
-              <td className="border border-gray-300 px-3 py-2 text-right text-red-800">
-                -
-                {totalDebit.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                })}
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                <div>{fmtInt(totalDebit)}</div>
+                <div className="text-xs font-normal opacity-90">
+                  AED {fmt(toAed(totalDebit))}
+                </div>
               </td>
             </tr>
           </tbody>
@@ -2223,20 +2188,146 @@ export function AdminTrialBalance() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-4 text-sm">
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Total Lena (INR / AED)</div>
-          <div className="font-bold text-red-700">
-            ₹
-            {totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">
+            Total Dena to Agents (INR)
           </div>
+          <div className="font-bold text-blue-700">₹{fmt(totalCredit)}</div>
+          <div className="text-xs text-blue-500 mt-0.5">
+            AED {fmt(toAed(totalCredit))}
+          </div>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Admin Commission (INR)</div>
+          <div className="font-bold text-purple-700">₹{fmt(adminComm)}</div>
+          <div className="text-xs text-purple-500 mt-0.5">
+            AED {fmt(toAed(adminComm))}
+          </div>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">
+            Total Dena + Commission (INR)
+          </div>
+          <div className="font-bold text-blue-700">
+            ₹{fmt(totalCreditWithComm)}
+          </div>
+          <div className="text-xs text-blue-500 mt-0.5">
+            AED {fmt(toAed(totalCreditWithComm))}
+          </div>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">
+            Total Lena from Merchants (INR)
+          </div>
+          <div className="font-bold text-red-700">₹{fmt(totalDebit)}</div>
           <div className="text-xs text-red-500 mt-0.5">
-            AED{" "}
-            {totalDebitAed.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-            })}
+            AED {fmt(toAed(totalDebit))}
+          </div>
+        </div>
+        <div
+          className={`border rounded-xl px-4 py-3 ${totalDebit - totalCreditWithComm === 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}
+        >
+          <div className="text-gray-500 text-xs">Difference (should be 0)</div>
+          <div
+            className={`font-bold ${totalDebit - totalCreditWithComm === 0 ? "text-green-700" : "text-red-700"}`}
+          >
+            ₹{fmt(totalDebit - totalCreditWithComm)}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            AED {fmt(toAed(totalDebit - totalCreditWithComm))}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+export function AdminExpenseManagers() {
+  const [managers, setManagers] = useState([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ name: "", username: "", password: "" });
+  const { impersonate } = useAuth();
+  const navigate = useNavigate();
+
+  const fetchManagers = async () => {
+    const r = await api.get("/admin/expense-managers");
+    setManagers(r.data.data || []);
+  };
+
+  useEffect(() => { fetchManagers(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api.post("/admin/expense-managers", form);
+      toast.success("Expense Manager created!");
+      setShowCreate(false);
+      setForm({ name: "", username: "", password: "" });
+      fetchManagers();
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Error.");
+    }
+  };
+
+  const columns = [
+    { header: "Sr No.", render: (r) => managers.indexOf(r) + 1 },
+    { header: "Name", key: "name" },
+    { header: "Username", key: "username" },
+    { header: "Status", render: (r) => <StatusBadge status={r.isActive ? "Active" : "Inactive"} /> },
+    { header: "Created", render: (r) => new Date(r.createdAt).toLocaleString() },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Expense Managers"
+        action={<Button onClick={() => setShowCreate(true)}>Add Expense Manager</Button>}
+      />
+      <DataTable
+        columns={columns}
+        data={managers}
+        total={managers.length}
+        page={1}
+        actions={(row) => (
+          <div className="flex gap-1">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `Username: ${row.username}\nPassword: ${row.plainPassword || "N/A"}\nLogin: ${window.location.origin}/login`
+                );
+                toast.success("Copied!");
+              }}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-sm"
+              title="Copy credentials"
+            >📋</button>
+            <button
+              onClick={async () => {
+                try {
+                  await impersonate(row.id);
+                  navigate("/expense-manager");
+                } catch (e) {
+                  toast.error("Failed.");
+                }
+              }}
+              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500"
+              title="Login as Expense Manager"
+            >🔑</button>
+          </div>
+        )}
+      />
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Expense Manager">
+        <form onSubmit={handleCreate}>
+          <FormInput label="Name" required value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full Name" />
+          <FormInput label="Username" required value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Login username" />
+          <FormInput label="Password" required type="password" value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Login password" />
+          <Button type="submit" className="w-full">Create</Button>
+        </form>
+      </Modal>
     </div>
   );
 }

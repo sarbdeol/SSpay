@@ -29,7 +29,7 @@ const MENUS = {
   ],
   MERCHANT: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/merchant' },
-    { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/merchant/daily-report' },
+    { label: 'Ledger', icon: HiOutlineDocumentText, path: '/merchant/ledger' },
     { label: 'Sub-Merchants', icon: HiOutlineUserGroup, path: '/merchant/submerchants' },
     { label: 'Configurations', icon: HiOutlineCog, children: [
       { label: 'Transactions', path: '/merchant/transactions' },
@@ -45,7 +45,7 @@ const MENUS = {
   ],
   AGENT: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/agent' },
-    { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/agent/daily-report' },
+    // { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/agent/daily-report' },
     { label: 'Ledger', icon: HiOutlineDocumentText, path: '/agent/ledger' },
     { label: 'Settlements', icon: HiOutlineCash, path: '/agent/settlements' },
     { label: 'Configurations', icon: HiOutlineCog, children: [
@@ -62,7 +62,7 @@ const MENUS = {
   ],
   COLLECTOR: [
     { label: 'Dashboard', icon: HiOutlineViewGrid, path: '/collector' },
-    { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/collector/daily-report' },
+    // { label: 'Daily Report', icon: HiOutlineDocumentReport, path: '/collector/daily-report' },
     { label: 'Trial Balance', icon: HiOutlineCash, path: '/collector/trial-balance' },
     { label: 'Configuration', icon: HiOutlineCog, children: [
       { label: 'Settlements', path: '/collector/settlements' },

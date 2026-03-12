@@ -25,34 +25,16 @@ router.get("/dashboard", async (req, res) => {
     };
 
     const [
-      commAgg,
-      payOutAgg,
-      payOutCount,
-      pendingCount,
-      pendingAmt,
-      clearedAmt,
-    ] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: { ...txWhere, status: "CLEARED" },
-        _sum: { agentCommission: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { ...txWhere, status: "CLEARED" },
-        _sum: { amount: true },
-      }),
-      prisma.transaction.count({ where: { ...txWhere, status: "CLEARED" } }),
-      prisma.transaction.count({
-        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
-      }),
-      prisma.transaction.aggregate({
-        where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } },
-        _sum: { amount: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { agentId, status: "CLEARED" },
-        _sum: { amount: true },
-      }),
-    ]);
+  commAgg, payOutAgg, payOutCount, pendingCount, pendingAmt, clearedAmt, adminCommAgg,
+] = await Promise.all([
+  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { agentCommission: true } }),
+  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { amount: true } }),
+  prisma.transaction.count({ where: { ...txWhere, status: "CLEARED" } }),
+  prisma.transaction.count({ where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } } }),
+  prisma.transaction.aggregate({ where: { ...txWhere, status: { in: ["PENDING", "PICKED", "PAID"] } }, _sum: { amount: true } }),
+  prisma.transaction.aggregate({ where: { agentId, status: "CLEARED" }, _sum: { amount: true } }),
+  prisma.transaction.aggregate({ where: { ...txWhere, status: "CLEARED" }, _sum: { adminCommission: true } }),
+]);
 
     // Available limit = SUM of assigned merchants' (maxPaymentLimit - usedLimit)
     const assigned = await prisma.merchantAgent.findMany({
@@ -118,16 +100,6 @@ router.get("/dashboard", async (req, res) => {
 
     const totalPaymentLunga = payOutAmount - agentCommission;
 
-    const payOutInAed =
-      aedRate > 0
-        ? Math.max(0, totalPaymentLunga / aedRate - confirmedAedAmount)
-        : 0;
-
-    const payOutInUsdt =
-      usdtRate > 0
-        ? Math.max(0, totalPaymentLunga / usdtRate - confirmedUsdtAmount)
-        : 0;
-
     const confirmedInInr =
       (aedRate > 0 ? confirmedAedAmount * aedRate : 0) +
       (usdtRate > 0 ? confirmedUsdtAmount * usdtRate : 0);
@@ -136,6 +108,9 @@ router.get("/dashboard", async (req, res) => {
       0,
       totalPaymentLunga - confirmedInInr,
     );
+
+    const payOutInAed = aedRate > 0 ? adjustedPaymentLunga / aedRate : 0;
+    const payOutInUsdt = usdtRate > 0 ? adjustedPaymentLunga / usdtRate : 0;
 
     res.json({
       success: true,
@@ -149,6 +124,9 @@ router.get("/dashboard", async (req, res) => {
         totalPaymentLunga: adjustedPaymentLunga,
         payOutInAed,
         payOutInUsdt,
+        confirmedSettlementAed: confirmedAedAmount,
+        confirmedSettlementUsdt: confirmedUsdtAmount,
+        totalAdminCommission: parseFloat(adminCommAgg._sum.adminCommission || 0),
       },
     });
   } catch (error) {

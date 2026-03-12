@@ -69,7 +69,10 @@ router.post('/impersonate/:userId', auth, async (req, res) => {
       if (target.merchant?.adminId === cur.adminId || target.agent?.adminId === cur.adminId ||
           target.collector?.adminId === cur.adminId || target.subMerchant?.merchant?.adminId === cur.adminId ||
           target.operator?.agent?.adminId === cur.adminId) allowed = true;
+      else if (target.role === 'EXPENSE_MANAGER' && target.createdBy === cur.id) allowed = true;
     }
+    
+    
     else if (cur.role === 'MERCHANT' && target.subMerchant?.merchantId === cur.merchantId) allowed = true;
     else if (cur.role === 'AGENT' && target.operator?.agentId === cur.agentId) allowed = true;
 
