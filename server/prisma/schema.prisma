@@ -217,7 +217,9 @@ model Agent {
 
   adminId                 Int
   admin                   Admin     @relation(fields: [adminId], references: [id])
-
+  walletAddress           String?
+  walletQrImage           String?
+  walletRemark            String?
   user                    User?
   operators               Operator[]
   assignedMerchants       MerchantAgent[]
@@ -372,7 +374,8 @@ model Settlement {
 
   collectorId     Int?
   collector       Collector?       @relation(fields: [collectorId], references: [id])
-
+  payRemark       String?
+  payScreenshot   String?
   agentId         Int?
   agent           Agent?           @relation(fields: [agentId], references: [id])
 

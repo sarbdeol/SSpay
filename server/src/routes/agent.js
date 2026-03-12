@@ -438,17 +438,35 @@ router.get("/ledger", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+
+// GET wallet profile (from agent's last submitted settlement)
+// GET wallet profile
+router.get("/wallet-profile", async (req, res) => {
+  try {
+    const agent = await prisma.agent.findUnique({
+      where: { id: req.user.agentId },
+      select: { walletAddress: true, walletQrImage: true, walletRemark: true },
+    });
+    res.json({ success: true, data: agent });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+
+
 // ═══ Settlements ═══
 router.get("/settlements", async (req, res) => {
   try {
     const data = await prisma.settlement.findMany({
-      where: { agentId: req.user.agentId },
-      include: {
-        merchant: { select: { name: true } },
-        collector: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+  where: { agentId: req.user.agentId },
+  include: {
+    merchant: { select: { name: true } },
+    collector: { select: { name: true } },
+  },
+  orderBy: { createdAt: "desc" },
+  // payScreenshot and payRemark are regular columns, already returned automatically
+});
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error." });
@@ -502,39 +520,34 @@ router.post("/settlements/:id/pick", async (req, res) => {
   }
 });
 
-router.post(
-  "/settlements/:id/submit",
-  upload.single("qrImage"),
-  async (req, res) => {
-    try {
-      const settlement = await prisma.settlement.findUnique({
-        where: { id: parseInt(req.params.id) },
-      });
-      if (!settlement)
-        return res.status(404).json({ success: false, message: "Not found." });
-      if (settlement.agentId !== req.user.agentId)
-        return res
-          .status(403)
-          .json({ success: false, message: "Not your settlement." });
-      if (settlement.status !== "PICKED")
-        return res
-          .status(400)
-          .json({ success: false, message: "Must be picked first." });
-      const { walletAddress } = req.body;
-      const updated = await prisma.settlement.update({
-        where: { id: parseInt(req.params.id) },
-        data: {
-          status: "SUBMITTED",
-          walletAddress: walletAddress || null,
-          proofImage: req.file ? req.file.filename : settlement.proofImage,
-        },
-      });
-      res.json({ success: true, data: updated });
-    } catch (error) {
-      res.status(500).json({ success: false, message: "Server error." });
-    }
-  },
-);
+// Update submit to also save remark
+router.post("/settlements/:id/submit", upload.single("qrImage"), async (req, res) => {
+  try {
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    if (!settlement)
+      return res.status(404).json({ success: false, message: "Not found." });
+    if (settlement.agentId !== req.user.agentId)
+      return res.status(403).json({ success: false, message: "Not your settlement." });
+    if (settlement.status !== "PICKED")
+      return res.status(400).json({ success: false, message: "Must be picked first." });
+
+    const { walletAddress, remark, existingQrImage } = req.body;
+    const updated = await prisma.settlement.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        status: "SUBMITTED",
+        walletAddress: walletAddress || null,
+        remark: remark || settlement.remark || null,
+        proofImage: req.file ? req.file.filename : (existingQrImage || settlement.proofImage),
+      },
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
 
 router.post("/settlements/:id/reject", async (req, res) => {
   try {
@@ -580,6 +593,18 @@ router.post("/settlements/:id/confirm", async (req, res) => {
       data: { status: "CONFIRMED" },
     });
     res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+// SAVE wallet profile
+router.post("/settlement-details", upload.single("qrImage"), async (req, res) => {
+  try {
+    const { walletAddress, remark } = req.body;
+    const data = { walletAddress: walletAddress || null, walletRemark: remark || null };
+    if (req.file) data.walletQrImage = req.file.filename;
+    await prisma.agent.update({ where: { id: req.user.agentId }, data });
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error." });
   }

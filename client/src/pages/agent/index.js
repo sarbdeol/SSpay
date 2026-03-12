@@ -29,14 +29,19 @@ export function AgentDashboard() {
     ]).then(([r, rateRes]) => {
       setStats(r.data.data);
       const rt = rateRes.data.data?.[0];
-      if (rt) setRates({
-        aedTodayRate: parseFloat(rt.aedTodayRate || 1),
-        usdtTodayRate: parseFloat(rt.usdtTodayRate || 1),
-      });
+      if (rt)
+        setRates({
+          aedTodayRate: parseFloat(rt.aedTodayRate || 1),
+          usdtTodayRate: parseFloat(rt.usdtTodayRate || 1),
+        });
     });
   }, []);
 
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n) =>
+    parseFloat(n || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   const { aedTodayRate, usdtTodayRate } = rates;
 
   const settledInr =
@@ -48,26 +53,46 @@ export function AgentDashboard() {
     <div>
       <PageHeader title="Agent Dashboard" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-        <StatCard title="Total Pay Out Amount" value={stats?.totalPayOutAmount || 0} index={2} />
+        <StatCard
+          title="Total Pay Out Amount"
+          value={stats?.totalPayOutAmount || 0}
+          index={2}
+        />
 
         {/* Admin Commission To Pay */}
         <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl p-5 text-white shadow-sm">
-          <p className="text-sm font-medium opacity-80 mb-2">Admin Commission (To Pay)</p>
-          <p className="text-xl font-bold">₹{fmt(stats?.totalAdminCommission || 0)}</p>
+          <p className="text-sm font-medium opacity-80 mb-2">
+            Admin Commission (To Pay)
+          </p>
+          <p className="text-xl font-bold">
+            ₹{fmt(stats?.totalAdminCommission || 0)}
+          </p>
           <div className="mt-2 pt-2 border-t border-white/20 text-xs">
             <div className="flex justify-between opacity-90">
               <span>In AED</span>
-              <strong>AED {fmt(aedTodayRate > 0 ? (stats?.totalAdminCommission || 0) / aedTodayRate : 0)}</strong>
+              <strong>
+                AED{" "}
+                {fmt(
+                  aedTodayRate > 0
+                    ? (stats?.totalAdminCommission || 0) / aedTodayRate
+                    : 0,
+                )}
+              </strong>
             </div>
           </div>
         </div>
 
-        <StatCard title="Total Agent Commission" value={stats?.totalAgentCommission || 0} index={0} />
+        <StatCard
+          title="Total Agent Commission"
+          value={stats?.totalAgentCommission || 0}
+          index={0}
+        />
 
         {/* Total Settlement Received */}
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl p-5 text-white shadow-sm">
-          <p className="text-sm font-medium opacity-80 mb-2">Total Settlement Received</p>
+          <p className="text-sm font-medium opacity-80 mb-2">
+            Total Settlement Received
+          </p>
           <p className="text-xl font-bold">₹{fmt(settledInr)}</p>
           <div className="mt-2 pt-2 border-t border-white/20 text-xs">
             <div className="flex justify-between font-bold">
@@ -79,8 +104,12 @@ export function AgentDashboard() {
 
         {/* Total Payment Lunga */}
         <div className="bg-gradient-to-br from-indigo-400 to-purple-500 rounded-2xl p-5 text-white shadow-sm">
-          <p className="text-sm font-medium opacity-80 mb-2">Total Payment Lunga</p>
-          <p className="text-xl font-bold">₹{fmt(stats?.totalPaymentLunga || 0)}</p>
+          <p className="text-sm font-medium opacity-80 mb-2">
+            Total Payment Lunga
+          </p>
+          <p className="text-xl font-bold">
+            ₹{fmt(stats?.totalPaymentLunga || 0)}
+          </p>
           <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
             <div className="flex justify-between opacity-90">
               <span>In AED</span>
@@ -93,11 +122,28 @@ export function AgentDashboard() {
           </div>
         </div>
 
-        <StatCard title="Pending Amount" value={stats?.totalPendingAmount || 0} index={4} />
-        <StatCard title="Available Details" value={stats?.availableLimit || 0} index={5} />
-        <StatCard title="Total Pay Out Transactions" value={stats?.totalPayOutTransactions || 0} prefix="" index={1} />
-        <StatCard title="Total Pending Transactions" value={stats?.totalPendingTransactions || 0} prefix="" index={3} />
-
+        <StatCard
+          title="Pending Amount"
+          value={stats?.totalPendingAmount || 0}
+          index={4}
+        />
+        <StatCard
+          title="Available Details"
+          value={stats?.availableLimit || 0}
+          index={5}
+        />
+        <StatCard
+          title="Total Pay Out Transactions"
+          value={stats?.totalPayOutTransactions || 0}
+          prefix=""
+          index={1}
+        />
+        <StatCard
+          title="Total Pending Transactions"
+          value={stats?.totalPendingTransactions || 0}
+          prefix=""
+          index={3}
+        />
       </div>
     </div>
   );
@@ -741,7 +787,10 @@ export function AgentLedger() {
   useEffect(() => {
     setLoading(true);
     const params = {};
-    if (selectedDate) { params.startDate = selectedDate; params.endDate = selectedDate; }
+    if (selectedDate) {
+      params.startDate = selectedDate;
+      params.endDate = selectedDate;
+    }
     Promise.all([
       api.get("/agent/ledger", { params }),
       api.get("/config/current-rates"),
@@ -750,14 +799,19 @@ export function AgentLedger() {
       .then(([txRes, rateRes, settlRes]) => {
         setTransactions(txRes.data.data || []);
         const r = rateRes.data.data?.[0];
-        if (r) setRates({
-          aedTodayRate: parseFloat(r.aedTodayRate || 1),
-          usdtTodayRate: parseFloat(r.usdtTodayRate || 1),
-        });
+        if (r)
+          setRates({
+            aedTodayRate: parseFloat(r.aedTodayRate || 1),
+            usdtTodayRate: parseFloat(r.usdtTodayRate || 1),
+          });
         const daySettlements = (settlRes.data.data || []).filter((s) => {
-          if (!selectedDate) return s.status === "CONFIRMED" || s.status === "SUBMITTED";
+          if (!selectedDate)
+            return s.status === "CONFIRMED" || s.status === "SUBMITTED";
           const d = new Date(s.updatedAt).toISOString().split("T")[0];
-          return d === selectedDate && (s.status === "CONFIRMED" || s.status === "SUBMITTED");
+          return (
+            d === selectedDate &&
+            (s.status === "CONFIRMED" || s.status === "SUBMITTED")
+          );
         });
         setSettlements(daySettlements);
         setLoading(false);
@@ -769,7 +823,12 @@ export function AgentLedger() {
     const groups = {};
     transactions.forEach((tx) => {
       const opName = tx.operator?.name || "No Operator";
-      if (!groups[opName]) groups[opName] = { operatorName: opName, totalINR: 0, totalCommission: 0 };
+      if (!groups[opName])
+        groups[opName] = {
+          operatorName: opName,
+          totalINR: 0,
+          totalCommission: 0,
+        };
       groups[opName].totalINR += parseFloat(tx.amount);
       groups[opName].totalCommission += parseFloat(tx.agentCommission || 0);
     });
@@ -780,19 +839,40 @@ export function AgentLedger() {
   const { aedTodayRate, usdtTodayRate } = rates;
   const toAed = (inr) => (aedTodayRate > 0 ? inr / aedTodayRate : 0);
   const toUsdt = (inr) => (usdtTodayRate > 0 ? inr / usdtTodayRate : 0);
-  const grandINR = Object.values(operatorGroups).reduce((s, g) => s + g.totalINR, 0);
-  const grandCommission = Object.values(operatorGroups).reduce((s, g) => s + g.totalCommission, 0);
+  const grandINR = Object.values(operatorGroups).reduce(
+    (s, g) => s + g.totalINR,
+    0,
+  );
+  const grandCommission = Object.values(operatorGroups).reduce(
+    (s, g) => s + g.totalCommission,
+    0,
+  );
   const grandBalance = grandINR - grandCommission;
-  const totalSettledAed = settlements.filter((s) => s.currency === "AED").reduce((s, r) => s + parseFloat(r.amount), 0);
-  const totalSettledUsdt = settlements.filter((s) => s.currency === "USDT").reduce((s, r) => s + parseFloat(r.amount), 0);
-  const totalSettledInr = totalSettledAed * aedTodayRate + totalSettledUsdt * usdtTodayRate;
+  const totalSettledAed = settlements
+    .filter((s) => s.currency === "AED")
+    .reduce((s, r) => s + parseFloat(r.amount), 0);
+  const totalSettledUsdt = settlements
+    .filter((s) => s.currency === "USDT")
+    .reduce((s, r) => s + parseFloat(r.amount), 0);
+  const totalSettledInr =
+    totalSettledAed * aedTodayRate + totalSettledUsdt * usdtTodayRate;
   const netBalance = grandBalance - totalSettledInr;
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n) =>
+    parseFloat(n || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
   const dateLabel = selectedDate
-    ? new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")
+    ? new Date(selectedDate)
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+        })
+        .replace(/\//g, "-")
     : "All";
 
   return (
@@ -801,13 +881,21 @@ export function AgentLedger() {
         <PageHeader title="Agent Collection Ledger" />
         <div className="flex items-end gap-2">
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+            <label className="text-xs font-medium text-gray-500 mb-1 block">
+              Select Date
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac"
+            />
           </div>
           {selectedDate && (
-            <button onClick={() => setSelectedDate("")}
-              className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <button
+              onClick={() => setSelectedDate("")}
+              className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
               Clear
             </button>
           )}
@@ -822,19 +910,36 @@ export function AgentLedger() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-50">
-              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">SR.</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">OPERATOR</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">TOTAL AMOUNT (INR)</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">COMMISSION (INR)</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">LENA BALANCE</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">SETTLEMENT (AED)</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">NET LENA</th>
+              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">
+                SR.
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                OPERATOR
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                TOTAL AMOUNT (INR)
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                COMMISSION (INR)
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                LENA BALANCE
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                SETTLEMENT (AED)
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                NET LENA
+              </th>
             </tr>
           </thead>
           <tbody>
             {Object.keys(operatorGroups).length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-200 px-3 py-6 text-center text-gray-400">
+                <td
+                  colSpan={7}
+                  className="border border-gray-200 px-3 py-6 text-center text-gray-400"
+                >
                   No cleared transactions{selectedDate ? " for this date" : ""}.
                 </td>
               </tr>
@@ -842,25 +947,57 @@ export function AgentLedger() {
               Object.values(operatorGroups).map((group, idx) => {
                 const balance = group.totalINR - group.totalCommission;
                 return (
-                  <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-gray-500">{idx + 1}</td>
-                    <td className="border border-gray-200 px-3 py-2 font-semibold text-gray-800">{group.operatorName.toUpperCase()}</td>
-                    <td className="border border-gray-200 px-3 py-2 text-right font-medium">₹{fmt(group.totalINR)}</td>
-                    <td className="border border-gray-200 px-3 py-2 text-right text-red-600 font-medium">₹{fmt(group.totalCommission)}</td>
+                  <tr
+                    key={idx}
+                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    <td className="border border-gray-200 px-3 py-2 text-center text-gray-500">
+                      {idx + 1}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 font-semibold text-gray-800">
+                      {group.operatorName.toUpperCase()}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-right font-medium">
+                      ₹{fmt(group.totalINR)}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-right text-red-600 font-medium">
+                      ₹{fmt(group.totalCommission)}
+                    </td>
                     <td className="border border-gray-200 px-3 py-2 text-right">
-                      <div className="font-semibold text-green-600">₹{fmt(balance)}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">AED {fmt(toAed(balance))} | USDT {fmt(toUsdt(balance))}</div>
+                      <div className="font-semibold text-green-600">
+                        ₹{fmt(balance)}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        AED {fmt(toAed(balance))} | USDT {fmt(toUsdt(balance))}
+                      </div>
                     </td>
                     {idx === 0 && (
                       <>
-                        <td className="border border-gray-200 px-3 py-2 text-right text-orange-600 font-medium" rowSpan={Object.keys(operatorGroups).length}>
-                          {totalSettledAed > 0 && <div>AED {fmt(totalSettledAed)}</div>}
-                          {totalSettledUsdt > 0 && <div>USDT {fmt(totalSettledUsdt)}</div>}
-                          <div className="text-xs text-gray-400 mt-0.5">₹{fmt(totalSettledInr)}</div>
+                        <td
+                          className="border border-gray-200 px-3 py-2 text-right text-orange-600 font-medium"
+                          rowSpan={Object.keys(operatorGroups).length}
+                        >
+                          {totalSettledAed > 0 && (
+                            <div>AED {fmt(totalSettledAed)}</div>
+                          )}
+                          {totalSettledUsdt > 0 && (
+                            <div>USDT {fmt(totalSettledUsdt)}</div>
+                          )}
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            ₹{fmt(totalSettledInr)}
+                          </div>
                         </td>
-                        <td className="border border-gray-200 px-3 py-2 text-right" rowSpan={Object.keys(operatorGroups).length}>
-                          <div className="font-semibold text-blue-600">₹{fmt(netBalance)}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">AED {fmt(toAed(grandBalance) - totalSettledAed)} | USDT {fmt(toUsdt(netBalance))}</div>
+                        <td
+                          className="border border-gray-200 px-3 py-2 text-right"
+                          rowSpan={Object.keys(operatorGroups).length}
+                        >
+                          <div className="font-semibold text-blue-600">
+                            ₹{fmt(netBalance)}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            AED {fmt(toAed(grandBalance) - totalSettledAed)} |
+                            USDT {fmt(toUsdt(netBalance))}
+                          </div>
                         </td>
                       </>
                     )}
@@ -869,20 +1006,37 @@ export function AgentLedger() {
               })
             )}
             <tr className="bg-brand-500 text-white font-bold">
-              <td className="border border-gray-300 px-3 py-2 text-center" colSpan={2}>TOTAL</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandINR)}</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandCommission)}</td>
+              <td
+                className="border border-gray-300 px-3 py-2 text-center"
+                colSpan={2}
+              >
+                TOTAL
+              </td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                ₹{fmt(grandINR)}
+              </td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                ₹{fmt(grandCommission)}
+              </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>₹{fmt(grandBalance)}</div>
-                <div className="text-xs font-normal mt-0.5 opacity-90">AED {fmt(toAed(grandBalance))} | USDT {fmt(toUsdt(grandBalance))}</div>
+                <div className="text-xs font-normal mt-0.5 opacity-90">
+                  AED {fmt(toAed(grandBalance))} | USDT{" "}
+                  {fmt(toUsdt(grandBalance))}
+                </div>
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
                 {totalSettledAed > 0 && <div>AED {fmt(totalSettledAed)}</div>}
-                {totalSettledUsdt > 0 && <div>USDT {fmt(totalSettledUsdt)}</div>}
+                {totalSettledUsdt > 0 && (
+                  <div>USDT {fmt(totalSettledUsdt)}</div>
+                )}
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>₹{fmt(netBalance)}</div>
-                <div className="text-xs font-normal mt-0.5 opacity-90">AED {fmt(toAed(grandBalance) - totalSettledAed)} | USDT {fmt(toUsdt(netBalance))}</div>
+                <div className="text-xs font-normal mt-0.5 opacity-90">
+                  AED {fmt(toAed(grandBalance) - totalSettledAed)} | USDT{" "}
+                  {fmt(toUsdt(netBalance))}
+                </div>
               </td>
             </tr>
           </tbody>
@@ -896,29 +1050,49 @@ export function AgentLedger() {
         </div>
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Commission:</span>
-          <span className="ml-2 font-bold text-red-700">₹{fmt(grandCommission)}</span>
+          <span className="ml-2 font-bold text-red-700">
+            ₹{fmt(grandCommission)}
+          </span>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Lena Balance:</span>
-          <span className="ml-2 font-bold text-green-600">₹{fmt(grandBalance)}</span>
+          <span className="ml-2 font-bold text-green-600">
+            ₹{fmt(grandBalance)}
+          </span>
         </div>
         <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Settlement:</span>
-          {totalSettledAed > 0 && <span className="ml-2 font-bold text-orange-600">AED {fmt(totalSettledAed)}</span>}
-          {totalSettledUsdt > 0 && <span className="ml-2 font-bold text-orange-600">USDT {fmt(totalSettledUsdt)}</span>}
-          {totalSettledAed === 0 && totalSettledUsdt === 0 && <span className="ml-2 font-bold text-gray-400">—</span>}
+          {totalSettledAed > 0 && (
+            <span className="ml-2 font-bold text-orange-600">
+              AED {fmt(totalSettledAed)}
+            </span>
+          )}
+          {totalSettledUsdt > 0 && (
+            <span className="ml-2 font-bold text-orange-600">
+              USDT {fmt(totalSettledUsdt)}
+            </span>
+          )}
+          {totalSettledAed === 0 && totalSettledUsdt === 0 && (
+            <span className="ml-2 font-bold text-gray-400">—</span>
+          )}
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Net Lena:</span>
-          <span className="ml-2 font-bold text-blue-700">₹{fmt(netBalance)}</span>
+          <span className="ml-2 font-bold text-blue-700">
+            ₹{fmt(netBalance)}
+          </span>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Net AED:</span>
-          <span className="ml-2 font-bold text-green-700">{fmt(toAed(grandBalance) - totalSettledAed)}</span>
+          <span className="ml-2 font-bold text-green-700">
+            {fmt(toAed(grandBalance) - totalSettledAed)}
+          </span>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Net USDT:</span>
-          <span className="ml-2 font-bold text-purple-700">{fmt(toUsdt(netBalance))}</span>
+          <span className="ml-2 font-bold text-purple-700">
+            {fmt(toUsdt(netBalance))}
+          </span>
         </div>
       </div>
     </div>
@@ -929,13 +1103,28 @@ export function AgentSettlements() {
   const [items, setItems] = useState([]);
   const [showSubmit, setShowSubmit] = useState(null);
   const [walletAddress, setWalletAddress] = useState("");
+  const [walletRemark, setWalletRemark] = useState("");
   const [qrImage, setQrImage] = useState(null);
-
+  const [savedProfile, setSavedProfile] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(null);
   const fetchData = () =>
     api.get("/agent/settlements").then((r) => setItems(r.data.data));
+
   useEffect(() => {
     fetchData();
+    api
+      .get("/agent/wallet-profile")
+      .then((r) => setSavedProfile(r.data.data))
+      .catch(() => {});
   }, []);
+
+  const openSubmit = (r) => {
+    setShowSubmit(r);
+    setWalletAddress(savedProfile?.walletAddress || "");
+    setWalletRemark(savedProfile?.walletRemark || "");
+
+    setQrImage(null);
+  };
 
   const handlePick = async (id) => {
     try {
@@ -952,19 +1141,28 @@ export function AgentSettlements() {
     try {
       const formData = new FormData();
       formData.append("walletAddress", walletAddress);
-      if (qrImage) formData.append("qrImage", qrImage);
+      formData.append("remark", walletRemark);
+      if (qrImage) {
+        formData.append("qrImage", qrImage);
+      } else if (savedProfile?.walletQrImage) {
+        formData.append("existingQrImage", savedProfile.walletQrImage);
+      }
       await api.post(`/agent/settlements/${showSubmit.id}/submit`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       toast.success("Submitted!");
       setShowSubmit(null);
-      setWalletAddress("");
-      setQrImage(null);
+      // Refresh saved profile with latest
+      api
+        .get("/agent/wallet-profile")
+        .then((r) => setSavedProfile(r.data.data))
+        .catch(() => {});
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.message || "Error.");
     }
   };
+
   const handleConfirm = async (id) => {
     try {
       await api.post(`/agent/settlements/${id}/confirm`);
@@ -974,6 +1172,7 @@ export function AgentSettlements() {
       toast.error(e.response?.data?.message || "Error.");
     }
   };
+
   const handleReject = async (id) => {
     const reason = window.prompt("Enter reject reason:");
     if (!reason) return;
@@ -989,6 +1188,36 @@ export function AgentSettlements() {
   return (
     <div>
       <PageHeader title="Settlements" />
+
+      {/* Saved Profile Banner */}
+      {savedProfile?.walletAddress && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-4">
+          {savedProfile.proofImage && (
+            <img
+              src={`/uploads/settlements/${savedProfile.walletQrImage}`}
+              alt="QR"
+              className="h-14 w-14 object-contain rounded-lg border border-green-200 bg-white"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-green-700 mb-0.5">
+              Saved Settlement Details
+            </p>
+            <p className="text-sm text-gray-700 font-mono truncate">
+              {savedProfile.walletAddress}
+            </p>
+            {savedProfile.remark && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {savedProfile.remark}
+              </p>
+            )}
+          </div>
+          <p className="text-xs text-green-600 whitespace-nowrap">
+            Auto-fills on submit
+          </p>
+        </div>
+      )}
+
       <DataTable
         columns={[
           {
@@ -998,7 +1227,17 @@ export function AgentSettlements() {
           },
           { header: "Collector", render: (r) => r.collector?.name || "-" },
           { header: "Remark", render: (r) => r.remark || "-" },
-          { header: "Wallet", render: (r) => r.walletAddress || "-" },
+          {
+            header: "Wallet",
+            render: (r) =>
+              r.walletAddress ? (
+                <span className="font-mono text-xs truncate max-w-[120px] block">
+                  {r.walletAddress}
+                </span>
+              ) : (
+                "-"
+              ),
+          },
           {
             header: "QR",
             render: (r) =>
@@ -1018,14 +1257,6 @@ export function AgentSettlements() {
           {
             header: "Status",
             render: (r) => {
-              const labels = {
-                PENDING: "Pending",
-                PICKED: "Picked",
-                SUBMITTED: "Submitted",
-                PAID: "Paid",
-                CONFIRMED: "Confirmed",
-                REJECTED: "Rejected",
-              };
               const styles = {
                 SUBMITTED: "bg-emerald-100 text-emerald-700",
                 PICKED: "bg-blue-100 text-blue-700",
@@ -1037,7 +1268,7 @@ export function AgentSettlements() {
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[r.status] || "bg-amber-100 text-amber-700"}`}
                 >
-                  {labels[r.status] || r.status}
+                  {r.status}
                 </span>
               );
             },
@@ -1064,11 +1295,7 @@ export function AgentSettlements() {
             {r.status === "PICKED" && (
               <>
                 <Button
-                  onClick={() => {
-                    setShowSubmit(r);
-                    setWalletAddress("");
-                    setQrImage(null);
-                  }}
+                  onClick={() => openSubmit(r)}
                   variant="primary"
                   className="h-7 px-2 text-xs"
                 >
@@ -1084,39 +1311,68 @@ export function AgentSettlements() {
               </>
             )}
             {r.status === "PAID" && (
-              <Button
-                onClick={() => handleConfirm(r.id)}
-                variant="primary"
-                className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700"
-              >
-                Confirm Received
-              </Button>
-            )}
+  <Button
+    onClick={() => setShowConfirm(r)}
+    variant="primary"
+    className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700"
+  >
+    Confirm Received
+  </Button>
+)}
           </div>
         )}
       />
 
+      {/* Submit Modal */}
       <Modal
         open={!!showSubmit}
         onClose={() => setShowSubmit(null)}
         title="Submit Settlement"
       >
         <form onSubmit={handleSubmit}>
-          <p className="text-sm text-gray-500 mb-3">
+          <p className="text-sm text-gray-500 mb-4">
             {showSubmit?.currency}{" "}
             {showSubmit && parseFloat(showSubmit.amount).toLocaleString()} —{" "}
             {showSubmit?.collector?.name || "Collector"}
           </p>
+
+          {savedProfile?.walletQrImage && !qrImage && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-3">
+              <img
+                src={`/uploads/settlements/${savedProfile.walletQrImage}`}
+                alt="QR"
+                className="h-12 w-12 object-contain rounded border border-blue-200 bg-white"
+              />
+              <div>
+                <p className="text-xs font-semibold text-blue-700">
+                  Saved QR will be used
+                </p>
+                <p className="text-xs text-gray-400">
+                  Upload new below to override for this submission
+                </p>
+              </div>
+            </div>
+          )}
+
           <FormInput
             label="USDT Wallet Address"
             required
             value={walletAddress}
             onChange={(e) => setWalletAddress(e.target.value)}
-            placeholder="Enter USDT wallet address"
+            placeholder="Enter wallet address"
+          />
+          <FormInput
+            label="Remark"
+            value={walletRemark}
+            onChange={(e) => setWalletRemark(e.target.value)}
+            placeholder="Optional remark"
           />
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Upload QR Image
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              QR Image{" "}
+              <span className="text-xs text-gray-400 font-normal">
+                {savedProfile?.walletQrImage ? "(saved QR used if empty)" : ""}
+              </span>
             </label>
             <input
               type="file"
@@ -1124,17 +1380,212 @@ export function AgentSettlements() {
               onChange={(e) => setQrImage(e.target.files[0])}
               className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100"
             />
-            {qrImage && (
-              <p className="text-xs text-gray-400 mt-1">
-                Selected: {qrImage.name}
-              </p>
-            )}
           </div>
           <Button type="submit" className="w-full">
-            Submit
+            Submit Settlement
           </Button>
         </form>
       </Modal>
+      {/* Confirm Modal — shows collector payment proof */}
+<Modal open={!!showConfirm} onClose={() => setShowConfirm(null)} title="Confirm Payment Received">
+  {showConfirm && (
+    <div>
+      {/* Payment details */}
+      <div className="mb-4 p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-400">Amount</span>
+          <span className="font-bold text-gray-800">{showConfirm.currency} {parseFloat(showConfirm.amount).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Collector</span>
+          <span className="font-medium">{showConfirm.collector?.name || "-"}</span>
+        </div>
+        {showConfirm.payRemark && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">Collector Remark</span>
+            <span className="font-medium">{showConfirm.payRemark}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Payment screenshot */}
+      {showConfirm.payScreenshot ? (
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payment Screenshot</p>
+          <a href={`/uploads/settlements/${showConfirm.payScreenshot}`} target="_blank" rel="noreferrer">
+            <img
+              src={`/uploads/settlements/${showConfirm.payScreenshot}`}
+              alt="Payment Screenshot"
+              className="w-full rounded-xl border border-gray-200 object-contain max-h-64 bg-gray-50 cursor-pointer hover:opacity-90"
+            />
+            <p className="text-xs text-blue-500 text-center mt-1">Click to open full size</p>
+          </a>
+        </div>
+      ) : (
+        <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+          No payment screenshot uploaded by collector.
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          onClick={() => setShowConfirm(null)}
+          variant="secondary"
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={async () => {
+            await handleConfirm(showConfirm.id);
+            setShowConfirm(null);
+          }}
+          className="flex-1 bg-teal-600 hover:bg-teal-700"
+        >
+          ✓ Confirm Received
+        </Button>
+      </div>
+    </div>
+  )}
+</Modal>
+    </div>
+  );
+}
+
+export function AgentSettlementDetails() {
+  const [profile, setProfile] = useState({ walletAddress: "", remark: "" });
+  const [qrImage, setQrImage] = useState(null);
+  const [existing, setExisting] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .get("/agent/wallet-profile")
+      .then((r) => {
+        setExisting(r.data.data);
+        setProfile({
+          walletAddress: r.data.data?.walletAddress || "",
+          remark: r.data.data?.remark || "",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!profile.walletAddress) {
+      toast.error("Wallet address required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Save by creating a dummy settlement with wallet details
+      // Instead we just store via a direct settlement update approach
+      // We'll POST to a dedicated save endpoint
+      const fd = new FormData();
+      fd.append("walletAddress", profile.walletAddress);
+      fd.append("remark", profile.remark);
+      if (qrImage) fd.append("qrImage", qrImage);
+      await api.post("/agent/settlement-details", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Settlement details saved!");
+      api.get("/agent/wallet-profile").then((r) => setExisting(r.data.data));
+      setQrImage(null);
+    } catch (e) {
+      toast.error("Error saving.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <PageHeader title="Settlement Details" />
+      <div className="max-w-lg">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-6 text-sm text-blue-700">
+          Save your wallet address and QR once — it will auto-fill every time
+          you submit a settlement.
+        </div>
+
+        {existing?.walletAddress && (
+          <div className="bg-white rounded-2xl shadow-card p-4 mb-6 border border-gray-100">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+              Current Saved Details
+            </p>
+            <div className="flex gap-4 items-start">
+              {existing.walletQrImage && (
+                <img
+                  src={`/uploads/settlements/${existing.walletQrImage}`}
+                  alt="QR"
+                  className="h-24 w-24 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 mb-1">Wallet Address</p>
+                <p className="text-sm font-mono text-gray-800 break-all">
+                  {existing.walletAddress}
+                </p>
+                {existing.remark && (
+                  <>
+                    <p className="text-xs text-gray-400 mt-2 mb-1">Remark</p>
+                    <p className="text-sm text-gray-600">{existing.remark}</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-card p-6">
+          <p className="text-sm font-semibold text-gray-700 mb-4">
+            {existing?.walletAddress ? "Update Details" : "Add Details"}
+          </p>
+          <form onSubmit={handleSave}>
+            <FormInput
+              label="USDT Wallet Address"
+              required
+              value={profile.walletAddress}
+              onChange={(e) =>
+                setProfile({ ...profile, walletAddress: e.target.value })
+              }
+              placeholder="Enter your USDT wallet address"
+            />
+            <FormInput
+              label="Remark"
+              value={profile.remark}
+              onChange={(e) =>
+                setProfile({ ...profile, remark: e.target.value })
+              }
+              placeholder="Optional remark"
+            />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                QR Image{" "}
+                {existing?.proofImage && (
+                  <span className="text-xs text-gray-400 font-normal">
+                    (upload new to replace)
+                  </span>
+                )}
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setQrImage(e.target.files[0])}
+                className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100"
+              />
+              {qrImage && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Selected: {qrImage.name}
+                </p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Saving..." : "Save Details"}
+            </Button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

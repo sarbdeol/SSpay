@@ -9,7 +9,7 @@ import { SuperAdminDashboard, AdminsList, AllUsersList, LoginHistoryList, Expens
 import { AdminDashboard, AdminMerchants, AdminAgents, AdminCollectors, AdminTransactions, AdminConfiguration, AdminCollections, DailyReport, AdminLedger, AdminTrialBalance ,AdminExpenseManagers  } from './pages/admin';
 import { MerchantDashboard, MerchantTransactions, MerchantSubmerchants, MerchantSettlements, MerchantConfiguration,MerchantLedger  } from './pages/merchant';
 import { SubMerchantDashboard, SubMerchantLedger, SubMerchantTransactions } from './pages/submerchant';
-import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements } from './pages/agent';
+import { AgentDashboard, AgentOperators, AgentOperatorUsers, AgentTransactions, AgentLedger, AgentSettlements ,AgentSettlementDetails} from './pages/agent';
 import { OperatorDashboard, OperatorTransactions,OperatorLedger  } from './pages/operator';
 import { CollectorDashboard, CollectorRequests, CollectorLedger ,CollectorSettlements ,CollectorTrialBalance } from './pages/collector';
 import { ExpenseManagerDashboard, ExpenseManagerEntries } from './pages/expense-manager';
@@ -79,6 +79,7 @@ export default function App() {
           <Route path="/agent/operators" element={<ProtectedRoute roles={['AGENT']}><AgentOperators /></ProtectedRoute>} />
           <Route path="/agent/operator-users" element={<ProtectedRoute roles={['AGENT']}><AgentOperatorUsers /></ProtectedRoute>} />
           <Route path="/agent/transactions" element={<ProtectedRoute roles={['AGENT']}><AgentTransactions /></ProtectedRoute>} />
+          <Route path="/agent/settlement-details" element={<ProtectedRoute roles={['AGENT']}><AgentSettlementDetails /></ProtectedRoute>} />
 
           {/* Operator */}
           <Route path="/operator" element={<ProtectedRoute roles={['OPERATOR']}><OperatorDashboard /></ProtectedRoute>} />

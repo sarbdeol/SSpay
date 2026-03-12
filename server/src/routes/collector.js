@@ -2,7 +2,14 @@ const router = require("express").Router();
 const prisma = require("../config/database");
 const { auth, roleCheck } = require("../middleware/auth");
 router.use(auth, roleCheck("COLLECTOR"));
+const multer = require('multer');
+const path = require('path');
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/settlements/'),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+const upload = multer({ storage });
 router.get('/dashboard', async (req, res) => {
   try {
     const collectorId = req.user.collectorId;
@@ -244,7 +251,7 @@ router.post("/settlements", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
-router.post("/settlements/:id/pay", async (req, res) => {
+router.post("/settlements/:id/pay", upload.single("screenshot"), async (req, res) => {
   try {
     const settlement = await prisma.settlement.findUnique({
       where: { id: parseInt(req.params.id) },
@@ -252,12 +259,16 @@ router.post("/settlements/:id/pay", async (req, res) => {
     if (!settlement)
       return res.status(404).json({ success: false, message: "Not found." });
     if (settlement.status !== "SUBMITTED")
-      return res
-        .status(400)
-        .json({ success: false, message: "Must be submitted first." });
+      return res.status(400).json({ success: false, message: "Must be submitted first." });
+
+    const { payRemark } = req.body;
     const updated = await prisma.settlement.update({
       where: { id: parseInt(req.params.id) },
-      data: { status: "PAID" },
+      data: {
+        status: "PAID",
+        payRemark: payRemark || null,
+        payScreenshot: req.file ? req.file.filename : null,
+      },
     });
     res.json({ success: true, data: updated });
   } catch (error) {
