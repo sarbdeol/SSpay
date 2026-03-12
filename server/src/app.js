@@ -34,5 +34,5 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 INDU PAY Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 SS PAY Server running on port ${PORT}`));
 module.exports = app;

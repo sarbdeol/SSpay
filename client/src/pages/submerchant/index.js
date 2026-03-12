@@ -58,7 +58,7 @@ function ReceiptImageModal({ transaction, onClose }) {
           <div style={{ background: '#1a1a2e', padding: '20px 24px', borderRadius: '16px 16px 0 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>INDU PAY</div>
+                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>SS PAY</div>
                 <div style={{ color: '#aeaeb2', fontSize: '12px', marginTop: '2px' }}>Payment Receipt</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -91,7 +91,7 @@ function ReceiptImageModal({ transaction, onClose }) {
           </div>
           <div style={{ padding: '12px 24px 20px', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
             <div style={{ color: '#aeaeb2', fontSize: '10px' }}>System generated receipt</div>
-            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 INDU PAY</div>
+            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 SS PAY</div>
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t border-gray-100">

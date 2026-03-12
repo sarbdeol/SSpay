@@ -50,7 +50,7 @@ export default function Login() {
               <circle cx="18" cy="18" r="4" fill="rgba(0,122,255,0.8)"/>
             </svg>
           </div>
-          <h1 className="text-[28px] font-semibold text-white tracking-tight mb-3">INDU PAY</h1>
+          <h1 className="text-[28px] font-semibold text-white tracking-tight mb-3">SS PAY</h1>
           <p className="text-[15px] text-white/60 leading-relaxed">
             Secure payment processing platform.<br/>Fast settlements. Real-time tracking.
           </p>
@@ -75,7 +75,7 @@ export default function Login() {
         <div className="w-full max-w-[380px]">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <h1 className="text-2xl font-bold text-[#1a1a2e]">INDU PAY</h1>
+            <h1 className="text-2xl font-bold text-[#1a1a2e]">SS PAY</h1>
           </div>
 
           <div className="mb-9">
@@ -141,7 +141,7 @@ export default function Login() {
           </form>
 
           <div className="text-center mt-8 pt-6 border-t border-[#e5e5ea]">
-            <p className="text-[12px] text-[#aeaeb2]">© 2026 INDU PAY. All rights reserved.</p>
+            <p className="text-[12px] text-[#aeaeb2]">© 2026 SS PAY. All rights reserved.</p>
           </div>
         </div>
       </div>

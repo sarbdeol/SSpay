@@ -116,7 +116,7 @@ export default function DashboardLayout({ children }) {
     <div className="flex h-screen bg-gray-50">
       <aside className={`fixed lg:static inset-y-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="h-16 flex items-center justify-center border-b border-gray-100 px-4">
-          {sidebarOpen ? <h1 className="text-lg font-bold text-brand-dark tracking-tight">INDU PAY</h1> : <span className="text-lg font-bold text-brand-500">IP</span>}
+          {sidebarOpen ? <h1 className="text-lg font-bold text-brand-dark tracking-tight">SS PAY</h1> : <span className="text-lg font-bold text-brand-500">IP</span>}
         </div>
         <div className="px-4 py-3 border-b border-gray-50">
           <p className="text-sm font-semibold text-gray-800 truncate">{user?.name}</p>

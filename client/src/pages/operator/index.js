@@ -59,7 +59,7 @@ function ReceiptImageModal({ transaction, onClose }) {
           <div style={{ background: '#1a1a2e', padding: '20px 24px', borderRadius: '16px 16px 0 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>INDU PAY</div>
+                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>SS PAY</div>
                 <div style={{ color: '#aeaeb2', fontSize: '12px', marginTop: '2px' }}>Payment Receipt</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -92,7 +92,7 @@ function ReceiptImageModal({ transaction, onClose }) {
           </div>
           <div style={{ padding: '12px 24px 20px', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
             <div style={{ color: '#aeaeb2', fontSize: '10px' }}>System generated receipt</div>
-            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 INDU PAY</div>
+            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 SS PAY</div>
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t border-gray-100">
@@ -364,13 +364,14 @@ export function OperatorLedger() {
   const [transactions, setTransactions] = useState([]);
   const [rates, setRates] = useState({ aedTodayRate: 1 });
   const [loading, setLoading] = useState(true);
-  const today = new Date().toISOString().split("T")[0];
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState("");
 
   useEffect(() => {
     setLoading(true);
+    const params = {};
+    if (selectedDate) { params.startDate = selectedDate; params.endDate = selectedDate; }
     Promise.all([
-      api.get("/operator/ledger"),
+      api.get("/operator/ledger", { params }),
       api.get("/config/current-rates"),
     ]).then(([txRes, rateRes]) => {
       setTransactions(txRes.data.data || []);
@@ -382,8 +383,15 @@ export function OperatorLedger() {
 
   const { aedTodayRate } = rates;
   const toAed = (inr) => aedTodayRate > 0 ? inr / aedTodayRate : 0;
-  const fmt = (n) => parseFloat(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const grandINR = transactions.reduce((s, tx) => s + parseFloat(tx.amount), 0);
+  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const grandINR = transactions.reduce((s, tx) => s + parseFloat(tx.amount || 0), 0);
+  const grandComm = transactions.reduce((s, tx) => s + parseFloat(tx.operatorCommission || 0), 0);
+  const grandNet = grandINR - grandComm;
+
+  const dateLabel = selectedDate
+    ? new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")
+    : "All";
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
@@ -391,15 +399,23 @@ export function OperatorLedger() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <PageHeader title="Ledger" />
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+          </div>
+          {selectedDate && (
+            <button onClick={() => setSelectedDate("")}
+              className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
       <div className="bg-brand-500 text-white text-center py-3 rounded-t-xl font-bold text-lg">
-        DAILY LEDGER ({new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")})
+        DAILY LEDGER ({dateLabel})
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
@@ -409,19 +425,27 @@ export function OperatorLedger() {
               <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">SR.</th>
               <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">NAME</th>
               <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">A/C NO.</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">IFSC CODE</th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">IFSC</th>
               <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">UTR</th>
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">RATE</th>
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (INR)</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (AED)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">COMMISSION</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">NET (INR)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">NET (AED)</th>
             </tr>
           </thead>
           <tbody>
             {transactions.length === 0 ? (
-              <tr><td colSpan={8} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No cleared transactions for this date.</td></tr>
+              <tr>
+                <td colSpan={10} className="border border-gray-200 px-3 py-6 text-center text-gray-400">
+                  No cleared transactions{selectedDate ? " for this date" : ""}.
+                </td>
+              </tr>
             ) : (
               transactions.map((tx, idx) => {
-                const inr = parseFloat(tx.amount);
+                const inr = parseFloat(tx.amount || 0);
+                const comm = parseFloat(tx.operatorCommission || 0);
+                const net = inr - comm;
                 return (
                   <tr key={tx.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                     <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-500">{idx + 1}</td>
@@ -429,9 +453,11 @@ export function OperatorLedger() {
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.accountNumber || '-'}</td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.ifscCode || '-'}</td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.utrNumber || '-'}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-600">{aedTodayRate}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">{aedTodayRate}</td>
                     <td className="border border-gray-200 px-3 py-1.5 text-right font-medium">₹{fmt(inr)}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-green-700">{fmt(toAed(inr))}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right text-red-600 font-medium">₹{fmt(comm)}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-semibold text-green-700">₹{fmt(net)}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-green-600">{fmt(toAed(net))}</td>
                   </tr>
                 );
               })
@@ -439,7 +465,9 @@ export function OperatorLedger() {
             <tr className="bg-brand-500 text-white font-bold">
               <td className="border border-gray-300 px-3 py-2 text-center" colSpan={6}>TOTAL</td>
               <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandINR)}</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(toAed(grandINR))}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandComm)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandNet)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(toAed(grandNet))}</td>
             </tr>
           </tbody>
         </table>
@@ -450,13 +478,17 @@ export function OperatorLedger() {
           <span className="text-gray-500">Total INR:</span>
           <span className="ml-2 font-bold text-gray-800">₹{fmt(grandINR)}</span>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">Total AED:</span>
-          <span className="ml-2 font-bold text-green-700">{fmt(toAed(grandINR))}</span>
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Commission:</span>
+          <span className="ml-2 font-bold text-red-700">₹{fmt(grandComm)}</span>
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-gray-500">AED Rate:</span>
-          <span className="ml-2 font-bold">{aedTodayRate}</span>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Net INR:</span>
+          <span className="ml-2 font-bold text-green-700">₹{fmt(grandNet)}</span>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <span className="text-gray-500">Net AED:</span>
+          <span className="ml-2 font-bold text-green-700">{fmt(toAed(grandNet))}</span>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">Transactions:</span>

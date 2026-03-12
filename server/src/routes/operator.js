@@ -567,6 +567,7 @@ router.get("/ledger", async (req, res) => {
         notes: true,
         transactionClearTime: true,
         createdAt: true,
+        operatorCommission: true,  // ADD THIS
       },
       orderBy: { createdAt: "desc" },
     });

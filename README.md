@@ -1,4 +1,4 @@
-# INDU PAY - Payment Processing Platform
+# SS PAY - Payment Processing Platform
 
 > Multi-role payment processing system with real-time transaction tracking, commission management, and settlement handling.
 
@@ -317,4 +317,4 @@ SUPER_ADMIN
 
 ---
 
-Built with ❤️ for INDU PAY
+Built with ❤️ for SS PAY

@@ -93,7 +93,7 @@ router.get('/daily/pdf', async (req, res) => {
 
     // ─── Header Banner ───
     doc.rect(0, 0, 612, 80).fill('#1a1a2e');
-    doc.fontSize(22).font('Helvetica-Bold').fillColor('#ffffff').text('INDU PAY', 45, 20);
+    doc.fontSize(22).font('Helvetica-Bold').fillColor('#ffffff').text('SS PAY', 45, 20);
     doc.fontSize(9).font('Helvetica').fillColor('#aeaeb2').text('Secure Payment Processing Platform', 45, 48);
     doc.fontSize(9).fillColor('#ffffff').text(`Daily Report`, 400, 20, { align: 'right', width: 160 });
     doc.fontSize(8).fillColor('#aeaeb2').text(`${startDate} to ${endDate}`, 400, 35, { align: 'right', width: 160 });
@@ -169,7 +169,7 @@ router.get('/daily/pdf', async (req, res) => {
     const pageHeight = 841;
     doc.rect(0, pageHeight - 40, 612, 40).fill('#f5f5f4');
     doc.fontSize(7).font('Helvetica').fillColor('#aeaeb2');
-    doc.text('This is a system-generated report. © 2026 INDU PAY', 45, pageHeight - 28);
+    doc.text('This is a system-generated report. © 2026 SS PAY', 45, pageHeight - 28);
     doc.text(`Page 1`, 500, pageHeight - 28, { align: 'right', width: 60 });
 
     doc.end();
@@ -266,7 +266,7 @@ router.get('/receipt/:transactionId', async (req, res) => {
     doc.fontSize(7).font('Helvetica').fillColor('#c7c7cc')
       .text('This is a system-generated receipt.', 0, y, { align: 'center', width: W });
     doc.fontSize(7).fillColor('#c7c7cc')
-      .text('© 2026 INDU PAY - Secure Payment Processing', 0, y + 12, { align: 'center', width: W });
+      .text('© 2026 SS PAY - Secure Payment Processing', 0, y + 12, { align: 'center', width: W });
 
     doc.end();
   } catch (error) {
@@ -301,15 +301,15 @@ router.get('/export/transactions', async (req, res) => {
     });
 
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'INDU PAY';
+    workbook.creator = 'SS PAY';
     const sheet = workbook.addWorksheet('Transactions', {
-      headerFooter: { firstHeader: 'INDU PAY - Transaction Report' }
+      headerFooter: { firstHeader: 'SS PAY - Transaction Report' }
     });
 
     // Title row
     sheet.mergeCells('A1:Q1');
     const titleCell = sheet.getCell('A1');
-    titleCell.value = 'INDU PAY - Transaction Report';
+    titleCell.value = 'SS PAY - Transaction Report';
     titleCell.font = { size: 14, bold: true, color: { argb: 'FF1a1a2e' } };
     titleCell.alignment = { horizontal: 'center' };
 
@@ -375,7 +375,7 @@ router.get('/export/transactions', async (req, res) => {
     sumRow.getCell(15).font = { bold: true, size: 9 };
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=INDUPAY-Transactions-${Date.now()}.xlsx`);
+    res.setHeader('Content-Disposition', `attachment; filename=SSPAY-Transactions-${Date.now()}.xlsx`);
     await workbook.xlsx.write(res);
   } catch (error) { console.error('Export:', error); res.status(500).json({ success: false, message: 'Export failed.' }); }
 });

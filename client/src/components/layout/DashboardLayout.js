@@ -130,7 +130,10 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className={`fixed lg:static inset-y-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="h-16 flex items-center justify-center border-b border-gray-100 px-4">{sidebarOpen ? <h1 className="text-lg font-bold text-brand-dark tracking-tight">INDU PAY</h1> : <span className="text-lg font-bold text-brand-500">IP</span>}</div>
+        <div className="h-16 flex items-center justify-center border-b border-gray-100 px-4">{sidebarOpen 
+  ? <img src="/sspaylogo.png" alt="SS Pay" className="h-9 w-auto object-contain" />
+  : <img src="/favicon-32x32.png" alt="SS" className="h-8 w-8 object-contain" />
+}</div>
         <div className="px-4 py-3 border-b border-gray-50"><p className="text-sm font-semibold text-gray-800 truncate">{user?.name}</p><p className="text-xs text-gray-400 truncate">{user?.role?.replace(/_/g, ' ')}</p></div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">{menuItems.map((item, i) => <SidebarItem key={i} item={item} collapsed={!sidebarOpen} />)}</nav>
         <div className="p-3 border-t border-gray-100">

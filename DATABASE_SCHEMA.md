@@ -1,4 +1,4 @@
-# INDU PAY — Database Schema Overview
+# SS PAY — Database Schema Overview
 ## Database: PostgreSQL | ORM: Prisma
 
 ---
