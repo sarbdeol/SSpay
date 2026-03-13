@@ -159,15 +159,14 @@ const MENUS = {
 function CurrencyRatesDropdown() {
   const [rates, setRates] = useState(null);
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    api
-      .get("/config/current-rates")
-      .then((r) => {
-        if (r.data.data?.length) setRates(r.data.data[0]);
-      })
-      .catch(() => {});
-  }, []);
+    if (!user) return;
+    api.get("/config/current-rates").then((r) => {
+      if (r.data.data?.length) setRates(r.data.data[0]);
+    }).catch(() => {});
+  }, [user]);
 
   return (
     <div className="relative">

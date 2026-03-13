@@ -233,328 +233,162 @@ export function CollectorLedger() {
   const [merchantLedger, setMerchantLedger] = useState([]);
   const [agentLedger, setAgentLedger] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
-  const [view, setView] = useState("both");
-  const [selectedMerchant, setSelectedMerchant] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState("");
+  const [view, setView] = useState("merchant");
+  const [selectedName, setSelectedName] = useState("");
 
   useEffect(() => {
+    setSelectedName("");
     setLoading(true);
     const params = {};
-    if (selectedDate) {
-      params.startDate = selectedDate;
-      params.endDate = selectedDate;
-    }
-    if (selectedAgent) params.agentId = selectedAgent;
-    Promise.all([
-      api.get("/collector/ledger", { params }),
-      api.get("/config/current-rates"),
-    ])
-      .then(([r, rateRes]) => {
+    if (selectedDate) { params.startDate = selectedDate; params.endDate = selectedDate; }
+    api.get("/collector/ledger", { params })
+      .then((r) => {
         setMerchantLedger(r.data.merchantLedger || []);
         setAgentLedger(r.data.agentLedger || []);
         setSummary(r.data.summary || null);
-        setAgents(r.data.agents || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [selectedDate, selectedAgent]);
+  }, [selectedDate]);
 
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const filteredMerchants = merchantLedger.filter(
-    (r) => !selectedMerchant || r.name === selectedMerchant,
-  );
-  const filteredAgents = agentLedger.filter(
-    (r) => !selectedAgent || r.name === selectedAgent,
-  );
+  const isMerchant = view === "merchant";
+  const rows = isMerchant ? merchantLedger : agentLedger;
+  const filteredRows = rows.filter((r) => !selectedName || r.name === selectedName);
+
+  const grandPending = filteredRows.reduce((s, r) => s + r.pending, 0);
+  const grandPendingAed = filteredRows.reduce((s, r) => s + r.pendingAed, 0);
+  const grandSettled = filteredRows.reduce((s, r) => s + r.settled, 0);
+  const grandSettledAed = filteredRows.reduce((s, r) => s + r.settledAed, 0);
+  const grandTotal = filteredRows.reduce((s, r) => s + r.total, 0);
+  const grandTotalAed = grandTotal / (summary?.aedRate || 1);
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
-
-  const LedgerTable = ({ rows, type }) => {
-    const isMerchant = type === "merchant";
-    const grandPending = rows.reduce((s, r) => s + r.pending, 0);
-    const grandPendingAed = rows.reduce((s, r) => s + r.pendingAed, 0);
-    const totalWithComm =
-      grandPending + parseFloat(summary?.totalAdminCommission || 0);
-    const totalWithCommAed =
-      grandPendingAed + parseFloat(summary?.totalAdminCommissionAed || 0);
-
-    return (
-      <div className="mb-6">
-        <div
-          className={`text-white text-center py-2 rounded-t-xl font-bold text-base ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}
-        >
-          {isMerchant ? "Merchant Se Lena" : "Agent Ko Dena"}
-        </div>
-        <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className={isMerchant ? "bg-red-50" : "bg-blue-50"}>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-10">
-                  SR.
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
-                  {isMerchant ? "MERCHANT" : "AGENT"}
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
-                  RATE
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
-                  AMOUNT (INR)
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
-                  AMOUNT (AED)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="border border-gray-200 px-3 py-6 text-center text-gray-400"
-                  >
-                    No data found.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                  >
-                    <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-500">
-                      {idx + 1}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">
-                      {row.name.toUpperCase()}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">
-                      {row.aedRate}
-                    </td>
-                    <td
-                      className={`border border-gray-200 px-3 py-1.5 text-right font-medium ${isMerchant ? "text-red-600" : "text-blue-600"}`}
-                    >
-                      ₹{fmt(row.pending)}
-                    </td>
-                    <td
-                      className={`border border-gray-200 px-3 py-1.5 text-right font-medium ${isMerchant ? "text-red-600" : "text-blue-600"}`}
-                    >
-                      {fmt(row.pendingAed)}
-                    </td>
-                  </tr>
-                ))
-              )}
-              {!isMerchant && (
-                <tr className="bg-purple-50">
-                  <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-400">
-                    —
-                  </td>
-                  <td
-                    className="border border-gray-200 px-3 py-1.5 font-semibold text-purple-700"
-                    colSpan={2}
-                  >
-                    ADMIN COMMISSION
-                  </td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700">
-                    ₹{fmt(summary?.totalAdminCommission)}
-                  </td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700">
-                    {fmt(summary?.totalAdminCommissionAed)}
-                  </td>
-                </tr>
-              )}
-              <tr
-                className={`text-white font-bold ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}
-              >
-                <td
-                  className="border border-gray-300 px-3 py-2 text-center"
-                  colSpan={3}
-                >
-                  TOTAL
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-right">
-                  ₹{isMerchant ? fmt(grandPending) : fmt(totalWithComm)}
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-right">
-                  {isMerchant ? fmt(grandPendingAed) : fmt(totalWithCommAed)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <PageHeader title="Ledger" />
+        <PageHeader title="Collection Ledger" />
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">
-            Select Date
-          </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac"
-          />
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500" />
         </div>
+
+        {/* Lena / Dena Toggle */}
         <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">
-            View
-          </label>
-          <select
-            value={view}
-            onChange={(e) => setView(e.target.value)}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[150px]"
-          >
-            <option value="both">Both</option>
-            <option value="merchant">Merchant Se Lena</option>
-            <option value="agent">Agent Ko Dena</option>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">View</label>
+          <div className="flex border border-gray-200 rounded-lg overflow-hidden h-9">
+            <button
+              onClick={() => { setView("merchant"); setSelectedName(""); }}
+              className={`px-4 text-sm font-semibold transition-all ${isMerchant ? "bg-red-500 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}
+            >Merchant Se Lena</button>
+            <button
+              onClick={() => { setView("agent"); setSelectedName(""); }}
+              className={`px-4 text-sm font-semibold transition-all ${!isMerchant ? "bg-blue-500 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}
+            >Agent Ko Dena</button>
+          </div>
+        </div>
+
+        {/* Name filter */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">{isMerchant ? "Merchant" : "Agent"}</label>
+          <select value={selectedName} onChange={(e) => setSelectedName(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[180px]">
+            <option value="">All {isMerchant ? "Merchants" : "Agents"}</option>
+            {rows.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
           </select>
         </div>
-        {(view === "both" || view === "merchant") && (
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
-              Merchant
-            </label>
-            <select
-              value={selectedMerchant}
-              onChange={(e) => setSelectedMerchant(e.target.value)}
-              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[180px]"
-            >
-              <option value="">All Merchants</option>
-              {merchantLedger.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {(view === "both" || view === "agent") && (
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
-              Agent
-            </label>
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 min-w-[180px]"
-            >
-              <option value="">All Agents</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+
         {selectedDate && (
-          <button
-            onClick={() => setSelectedDate("")}
-            className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Clear Date
-          </button>
+          <button onClick={() => setSelectedDate("")} className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 mt-5">Clear Date</button>
         )}
-        {selectedMerchant && (
-          <button
-            onClick={() => setSelectedMerchant("")}
-            className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Clear Merchant
-          </button>
-        )}
-        {selectedAgent && (
-          <button
-            onClick={() => setSelectedAgent("")}
-            className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Clear Agent
-          </button>
+        {selectedName && (
+          <button onClick={() => setSelectedName("")} className="h-9 px-3 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 mt-5">Clear Filter</button>
         )}
       </div>
 
-      {/* Tables */}
-      {(view === "both" || view === "merchant") && (
-        <LedgerTable rows={filteredMerchants} type="merchant" />
-      )}
-      {(view === "both" || view === "agent") && (
-        <LedgerTable rows={filteredAgents} type="agent" />
-      )}
+      {/* Table */}
+      <div className={`text-white text-center py-2 rounded-t-xl font-bold text-base ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}>
+        {isMerchant ? "Merchant Se Lena" : "Agent Ko Dena"}
+      </div>
+      <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className={isMerchant ? "bg-red-50" : "bg-blue-50"}>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">{isMerchant ? "MERCHANT" : "AGENT"}</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">RATE</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">TOTAL (INR)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">TOTAL (AED)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 bg-green-50">SETTLED (AED)</th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 bg-red-50">OUTSTANDING (AED)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr><td colSpan={6} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No data found.</td></tr>
+            ) : (
+              filteredRows.map((row, idx) => (
+                <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                  <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">{row.name.toUpperCase()}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">{row.aedRate}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">₹{fmt(row.total)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">{fmt(row.total / (summary?.aedRate || 1))}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-green-600 bg-green-50">{fmt(row.settledAed)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-semibold text-red-600 bg-red-50">{fmt(row.pendingAed)}</td>
+                </tr>
+              ))
+            )}
+            {!isMerchant && (
+              <tr className="bg-purple-50">
+                <td className="border border-gray-200 px-3 py-1.5 font-semibold text-purple-700" colSpan={4}>ADMIN COMMISSION</td>
+                <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700"></td>
+                <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-purple-700">{fmt(summary?.totalAdminCommissionAed)}</td>
+              </tr>
+            )}
+            <tr className={`text-white font-bold ${isMerchant ? "bg-red-500" : "bg-blue-500"}`}>
+              <td className="border border-gray-300 px-3 py-2" colSpan={2}>TOTAL</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandTotal)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(grandTotalAed)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(grandSettledAed)}</td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                {fmt(isMerchant ? grandPendingAed : grandPendingAed + (summary?.totalAdminCommissionAed || 0))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       {/* Summary Cards */}
-      <div className="mt-2 flex flex-wrap gap-4 text-sm">
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Merchant Lena (Pending)</div>
-          <div className="font-bold text-red-700">
-            ₹{fmt(summary?.merchantPending)}
-          </div>
-          <div className="text-xs text-red-500 mt-0.5">
-            AED {fmt(summary?.merchantPendingAed)}
-          </div>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm">
+        <div className={`border rounded-xl px-4 py-3 ${isMerchant ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
+          <div className="text-gray-500 text-xs">Outstanding (INR)</div>
+          <div className={`font-bold ${isMerchant ? "text-red-700" : "text-blue-700"}`}>₹{fmt(grandPending)}</div>
+          <div className={`text-xs mt-0.5 ${isMerchant ? "text-red-500" : "text-blue-500"}`}>AED {fmt(grandPendingAed)}</div>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Merchant Settled (AED)</div>
-          <div className="font-bold text-green-700">
-            AED {fmt(summary?.merchantSettledAed)}
-          </div>
+          <div className="text-gray-500 text-xs">Settled (AED)</div>
+          <div className="font-bold text-green-700">AED {fmt(grandSettledAed)}</div>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Agent Dena (Pending)</div>
-          <div className="font-bold text-blue-700">
-            ₹{fmt(summary?.agentPending)}
-          </div>
-          <div className="text-xs text-blue-500 mt-0.5">
-            AED {fmt(summary?.agentPendingAed)}
-          </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <div className="text-gray-500 text-xs">Total Cleared (INR)</div>
+          <div className="font-bold text-gray-800">₹{fmt(grandTotal)}</div>
+          <div className="text-xs text-gray-500 mt-0.5">AED {fmt(grandTotalAed)}</div>
         </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Admin Commission</div>
-          <div className="font-bold text-purple-700">
-            ₹{fmt(summary?.totalAdminCommission)}
+        {!isMerchant && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+            <div className="text-gray-500 text-xs">Admin Commission</div>
+            <div className="font-bold text-purple-700">₹{fmt(summary?.totalAdminCommission)}</div>
+            <div className="text-xs text-purple-500 mt-0.5">AED {fmt(summary?.totalAdminCommissionAed)}</div>
           </div>
-          <div className="text-xs text-purple-500 mt-0.5">
-            AED {fmt(summary?.totalAdminCommissionAed)}
-          </div>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">Agent Settled (AED)</div>
-          <div className="font-bold text-green-700">
-            AED {fmt(summary?.agentSettledAed)}
-          </div>
-        </div>
-        <div
-          className={`border rounded-xl px-4 py-3 ${Math.abs((summary?.merchantPending || 0) - (summary?.agentPendingWithComm || 0)) < 1 ? "bg-green-50 border-green-200" : "bg-orange-50 border-orange-200"}`}
-        >
-          <div className="text-gray-500 text-xs">
-            Agent + Commission (= Merchant Lena)
-          </div>
-          <div
-            className={`font-bold ${Math.abs((summary?.merchantPending || 0) - (summary?.agentPendingWithComm || 0)) < 1 ? "text-green-700" : "text-orange-700"}`}
-          >
-            ₹{fmt(summary?.agentPendingWithComm)}
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            AED {fmt(summary?.agentPendingWithCommAed)}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

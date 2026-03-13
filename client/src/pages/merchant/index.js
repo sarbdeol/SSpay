@@ -574,16 +574,23 @@ export function MerchantSettlements() {
 
 export function MerchantConfiguration() {
   const [subMerchants, setSubMerchants] = useState([]);
+  const [existingRates, setExistingRates] = useState([]);
   const [form, setForm] = useState({
     subMerchantId: "",
     usdtTodayRate: "",
     aedTodayRate: "",
   });
+  const [editRate, setEditRate] = useState(null);
+
+  const fetchRates = () => {
+    api.get("/merchant/rate-config").then((r) => {
+      setSubMerchants(r.data.subMerchants || []);
+      setExistingRates(r.data.rates || []);
+    });
+  };
 
   useEffect(() => {
-    api
-      .get("/merchant/rate-config")
-      .then((r) => setSubMerchants(r.data.subMerchants || []));
+    fetchRates();
   }, []);
 
   const handleUpdate = async (e) => {
@@ -591,10 +598,31 @@ export function MerchantConfiguration() {
     try {
       await api.post("/merchant/rate-config", form);
       toast.success("Rate updated!");
+      setForm({ subMerchantId: "", usdtTodayRate: "", aedTodayRate: "" });
+      fetchRates();
     } catch (e) {
       toast.error("Error updating rate.");
     }
   };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post("/merchant/rate-config", {
+        subMerchantId: editRate.agentId || "",
+        usdtTodayRate: editRate.usdtTodayRate,
+        aedTodayRate: editRate.aedTodayRate,
+      });
+      toast.success("Rate updated!");
+      setEditRate(null);
+      fetchRates();
+    } catch (e) {
+      toast.error("Error.");
+    }
+  };
+
+  const getSubMerchantName = (id) =>
+    subMerchants.find((s) => s.id === id)?.name || "-";
 
   return (
     <div>
@@ -602,42 +630,96 @@ export function MerchantConfiguration() {
         title="Configuration"
         subtitle="Set AED and USDT rates for sub-merchants"
       />
-      <div className="bg-white rounded-2xl shadow-card p-6 max-w-lg">
-        <form onSubmit={handleUpdate}>
-          <FormSelect
-            label="Select Sub-Merchant"
-            placeholder="All Sub-Merchants"
-            options={subMerchants.map((s) => ({ value: s.id, label: s.name }))}
-            value={form.subMerchantId}
-            onChange={(e) =>
-              setForm({ ...form, subMerchantId: e.target.value })
-            }
-          />
-          <FormInput
-            label="USDT Today Rate"
-            required
-            type="number"
-            step="0.0001"
-            value={form.usdtTodayRate}
-            onChange={(e) =>
-              setForm({ ...form, usdtTodayRate: e.target.value })
-            }
-            placeholder="e.g. 3.67"
-          />
-          <FormInput
-            label="AED Today Rate"
-            required
-            type="number"
-            step="0.0001"
-            value={form.aedTodayRate}
-            onChange={(e) => setForm({ ...form, aedTodayRate: e.target.value })}
-            placeholder="e.g. 3.67"
-          />
-          <Button type="submit" className="w-full">
-            Update Rate
-          </Button>
-        </form>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Set Rate Form */}
+        <div className="bg-white rounded-2xl shadow-card p-6">
+          <h3 className="text-base font-semibold text-gray-800 mb-4">Set New Rate</h3>
+          <form onSubmit={handleUpdate}>
+            <FormSelect
+              label="Select Sub-Merchant"
+              placeholder="All Sub-Merchants"
+              options={subMerchants.map((s) => ({ value: s.id, label: s.name }))}
+              value={form.subMerchantId}
+              onChange={(e) => setForm({ ...form, subMerchantId: e.target.value })}
+            />
+            <FormInput
+              label="USDT Today Rate"
+              required
+              type="number"
+              step="0.0001"
+              value={form.usdtTodayRate}
+              onChange={(e) => setForm({ ...form, usdtTodayRate: e.target.value })}
+              placeholder="e.g. 92"
+            />
+            <FormInput
+              label="AED Today Rate"
+              required
+              type="number"
+              step="0.0001"
+              value={form.aedTodayRate}
+              onChange={(e) => setForm({ ...form, aedTodayRate: e.target.value })}
+              placeholder="e.g. 26.05"
+            />
+            <Button type="submit" className="w-full">Update Rate</Button>
+          </form>
+        </div>
+
+        {/* Current Rates */}
+        <div className="bg-white rounded-2xl shadow-card p-6">
+          <h3 className="text-base font-semibold text-gray-800 mb-4">Current Rates</h3>
+          {existingRates.length === 0 ? (
+            <p className="text-sm text-gray-400">No rates configured yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {existingRates.map((rate) => (
+                <div key={rate.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-mac">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {rate.merchantId && !rate.agentId ? "All Sub-Merchants (Global)" : ""}
+                      {rate.agentId ? `Sub-Merchant: ${getSubMerchantName(rate.agentId)}` : ""}
+                    </p>
+                    <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                      <span>AED: <strong className="text-green-600">{parseFloat(rate.aedTodayRate).toFixed(4)}</strong></span>
+                      <span>USDT: <strong className="text-blue-600">{parseFloat(rate.usdtTodayRate).toFixed(4)}</strong></span>
+                      <span>Updated: {new Date(rate.updatedAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setEditRate({
+                      ...rate,
+                      aedTodayRate: parseFloat(rate.aedTodayRate),
+                      usdtTodayRate: parseFloat(rate.usdtTodayRate),
+                    })}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 text-sm transition-mac"
+                  >✏️</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Edit Modal */}
+      <Modal open={!!editRate} onClose={() => setEditRate(null)} title="Edit Rate">
+        {editRate && (
+          <form onSubmit={handleEdit}>
+            <p className="text-sm text-gray-500 mb-4">
+              {editRate.agentId ? `Sub-Merchant: ${getSubMerchantName(editRate.agentId)}` : "All Sub-Merchants (Global)"}
+            </p>
+            <FormInput
+              label="AED Today Rate" required type="number" step="0.0001"
+              value={editRate.aedTodayRate}
+              onChange={(e) => setEditRate({ ...editRate, aedTodayRate: e.target.value })}
+            />
+            <FormInput
+              label="USDT Today Rate" required type="number" step="0.0001"
+              value={editRate.usdtTodayRate}
+              onChange={(e) => setEditRate({ ...editRate, usdtTodayRate: e.target.value })}
+            />
+            <Button type="submit" className="w-full">Save Changes</Button>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }
