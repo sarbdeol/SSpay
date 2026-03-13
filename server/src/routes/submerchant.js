@@ -110,15 +110,20 @@ router.post('/transactions/upload', upload.single('file'), async (req, res) => {
     const transactions = [];
     sheet.eachRow((row, idx) => {
       if (idx === 1) return;
-      const type = row.getCell(1).value?.toString().toUpperCase();
+      const accountHolderName = row.getCell(1).value?.toString() || null;
+      const type = row.getCell(2).value?.toString().toUpperCase();
+      const upiOrAccount = row.getCell(3).value?.toString() || null;
+      const ifscCode = row.getCell(4).value?.toString() || null;
+      const amount = parseFloat(row.getCell(5).value) || 0;
+      const notes = row.getCell(6).value?.toString() || null;
       transactions.push({
         transactionType: type === 'UPI' ? 'UPI' : 'BANK_ACCOUNT',
-        amount: parseFloat(row.getCell(2).value) || 0,
-        upiId: type === 'UPI' ? row.getCell(3).value?.toString() : null,
-        accountNumber: type !== 'UPI' ? row.getCell(3).value?.toString() : null,
-        ifscCode: type !== 'UPI' ? row.getCell(4).value?.toString() : null,
-        accountHolderName: type !== 'UPI' ? row.getCell(5).value?.toString() : null,
-        notes: row.getCell(6).value?.toString() || null,
+        amount,
+        upiId: type === 'UPI' ? upiOrAccount : null,
+        accountNumber: type !== 'UPI' ? upiOrAccount : null,
+        ifscCode: type !== 'UPI' ? ifscCode : null,
+        accountHolderName: type !== 'UPI' ? accountHolderName : null,
+        notes,
       });
     });
     const subMerchant = await prisma.subMerchant.findUnique({ where: { id: req.user.subMerchantId }, include: { merchant: true } });
@@ -139,9 +144,9 @@ router.get('/transactions/example', async (req, res) => {
   try {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Transactions');
-    sheet.addRow(['Type', 'Amount', 'UPI_ID / Account_Number', 'IFSC_Code', 'Account_Holder_Name', 'Remark']);
-    sheet.addRow(['UPI', '500', '9876543210@upi', '', '', 'Monthly payment']);
-    sheet.addRow(['BANK_ACCOUNT', '1000', '1234567890', 'SBIN0001234', 'John Doe', 'Salary']);
+    sheet.addRow(['Account_Holder_Name', 'Type', 'UPI_ID / Account_Number', 'IFSC_Code', 'Amount', 'Remark']);
+    sheet.addRow(['', 'UPI', '9876543210@upi', '', '500', 'Monthly payment']);
+    sheet.addRow(['John Doe', 'BANK_ACCOUNT', '1234567890', 'SBIN0001234', '1000', 'Salary']);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=transaction_example.xlsx');
     await workbook.xlsx.write(res);

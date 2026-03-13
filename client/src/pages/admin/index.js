@@ -37,6 +37,8 @@ export function AdminDashboard() {
     fetchStats();
   }, [fetchStats]);
 
+  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -49,178 +51,120 @@ export function AdminDashboard() {
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <StatCard
-          title="Total RTGS Amount"
-          value={stats?.totalRtgsAmount || 0}
-          index={0}
-        />
+        <StatCard title="Total RTGS Amount" value={stats?.totalRtgsAmount || 0} index={0} />
+
+        {/* Total Lena */}
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl p-5 text-white shadow-sm">
-          <p className="text-sm font-medium opacity-80 mb-2">
-            Total Lena (from Merchants)
-          </p>
-          <p className="text-xl font-bold">
-            ₹
-            {(stats?.totalLena || 0).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </p>
+          <p className="text-sm font-medium opacity-80 mb-2">Total Lena (from Merchants)</p>
+          <p className="text-xl font-bold">₹{fmt(stats?.totalLena)}</p>
           <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
             <div className="flex justify-between opacity-90">
               <span>Total Cleared (INR)</span>
-              <strong>
-                ₹
-                {(stats?.totalRtgsAmount || 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
+              <strong>₹{fmt(stats?.totalRtgsAmount)}</strong>
             </div>
             <div className="flex justify-between opacity-90">
               <span>Settled (AED)</span>
-              <strong>
-                - AED{" "}
-                {(stats?.merchantSettledAed || 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
+              <strong>- AED {fmt(stats?.merchantSettledAed)}</strong>
             </div>
-            {stats?.merchantSettledUsdt > 0 && (
+            {(stats?.merchantSettledUsdt || 0) > 0 && (
               <div className="flex justify-between opacity-90">
                 <span>Settled (USDT)</span>
-                <strong>
-                  - USDT{" "}
-                  {stats.merchantSettledUsdt.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </strong>
+                <strong>- USDT {fmt(stats?.merchantSettledUsdt)}</strong>
               </div>
             )}
             <div className="flex justify-between font-bold border-t border-white/20 pt-1">
               <span>Remaining (INR)</span>
-              <span>
-                ₹
-                {(stats?.totalLena || 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+              <span>₹{fmt(stats?.totalLena)}</span>
             </div>
           </div>
         </div>
 
+        {/* Total Dena */}
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl p-5 text-white shadow-sm">
-          <p className="text-sm font-medium opacity-80 mb-2">
-            Total Dena (to Agents)
-          </p>
-          <p className="text-xl font-bold">
-            ₹
-            {(stats?.totalDena || 0).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </p>
+          <p className="text-sm font-medium opacity-80 mb-2">Total Dena (to Agents)</p>
+          <p className="text-xl font-bold">₹{fmt(stats?.totalDena)}</p>
           <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
             <div className="flex justify-between opacity-90">
               <span>Cleared - Commission (INR)</span>
-              <strong>
-                ₹
-                {(
-                  (stats?.totalRtgsAmount || 0) -
-                  (stats?.totalAdminCommission || 0)
-                ).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
+              <strong>₹{fmt((stats?.totalRtgsAmount || 0) - (stats?.totalAdminCommission || 0))}</strong>
             </div>
             <div className="flex justify-between opacity-90">
               <span>Settled (AED)</span>
-              <strong>
-                - AED{" "}
-                {(stats?.agentSettledAed || 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
+              <strong>- AED {fmt(stats?.agentSettledAed)}</strong>
             </div>
-            {stats?.agentSettledUsdt > 0 && (
+            {(stats?.agentSettledUsdt || 0) > 0 && (
               <div className="flex justify-between opacity-90">
                 <span>Settled (USDT)</span>
-                <strong>
-                  - USDT{" "}
-                  {stats.agentSettledUsdt.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </strong>
+                <strong>- USDT {fmt(stats?.agentSettledUsdt)}</strong>
               </div>
             )}
             <div className="flex justify-between font-bold border-t border-white/20 pt-1">
               <span>Remaining (INR)</span>
-              <span>
-                ₹
-                {(stats?.totalDena || 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+              <span>₹{fmt(stats?.totalDena)}</span>
             </div>
           </div>
         </div>
-        <StatCard
-          title="Admin Commission"
-          value={stats?.totalAdminCommission || 0}
-          index={3}
-        />
-        <StatCard
-          title="Available Details"
-          value={stats?.availableLimit || 0}
-          index={4}
-        />
-        <StatCard
-          title="Total Used"
-          value={stats?.totalUsedLimit || 0}
-          index={5}
-        />
-        <StatCard
-          title="Pending"
-          value={stats?.totalPending || 0}
-          prefix=""
-          index={6}
-        />
-        <StatCard
-          title="Picked / In Process"
-          value={stats?.totalPicked || 0}
-          prefix=""
-          index={7}
-        />
-        <StatCard
-          title="Cleared"
-          value={stats?.totalCleared || 0}
-          prefix=""
-          index={0}
-        />
-        <StatCard
-          title="Merchants"
-          value={stats?.merchantCount || 0}
-          prefix=""
-          index={1}
-        />
-        <StatCard
-          title="Agents"
-          value={stats?.agentCount || 0}
-          prefix=""
-          index={2}
-        />
-        <StatCard
-          title="Collectors"
-          value={stats?.collectorCount || 0}
-          prefix=""
-          index={3}
-        />
+
+        {/* Admin Commission — with rate diff breakdown */}
+        {/* Admin Commission — with rate diff breakdown */}
+{(() => {
+  const [commCurrency, setCommCurrency] = useState("AED");
+  const aedDiffInr = commCurrency === "AED" ? (stats?.totalAedDiffInr || 0) : 0;
+  const usdtDiffInr = commCurrency === "USDT" ? (stats?.totalUsdtDiffInr || 0) : 0;
+  const aedDiff = commCurrency === "AED" ? (stats?.totalAedDiff || 0) : 0;
+  const usdtDiff = commCurrency === "USDT" ? (stats?.totalUsdtDiff || 0) : 0;
+  const total = (stats?.totalAdminCommission || 0) + aedDiffInr + usdtDiffInr;
+
+  return (
+    <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl p-5 text-white shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium opacity-80">Admin Commission</p>
+        <div className="flex bg-white/20 rounded-lg p-0.5 gap-0.5">
+          <button
+            onClick={() => setCommCurrency("AED")}
+            className={`px-2 py-0.5 text-xs rounded-md font-semibold transition-all ${commCurrency === "AED" ? "bg-white text-purple-600" : "text-white/80 hover:text-white"}`}
+          >AED</button>
+          <button
+            onClick={() => setCommCurrency("USDT")}
+            className={`px-2 py-0.5 text-xs rounded-md font-semibold transition-all ${commCurrency === "USDT" ? "bg-white text-purple-600" : "text-white/80 hover:text-white"}`}
+          >USDT</button>
+        </div>
+      </div>
+      <p className="text-xl font-bold">₹{fmt(total)}</p>
+      <div className="mt-2 pt-2 border-t border-white/20 text-xs space-y-1">
+        <div className="flex justify-between opacity-90">
+          <span>INR (Commission %)</span>
+          <strong>₹{fmt(stats?.totalAdminCommission)}</strong>
+        </div>
+        {commCurrency === "AED" && (
+          <div className="flex justify-between opacity-90">
+            <span>AED Diff ({fmt(aedDiff)} AED)</span>
+            <strong>+ ₹{fmt(aedDiffInr)}</strong>
+          </div>
+        )}
+        {commCurrency === "USDT" && (
+          <div className="flex justify-between opacity-90">
+            <span>USDT Diff ({fmt(usdtDiff)} USDT)</span>
+            <strong>+ ₹{fmt(usdtDiffInr)}</strong>
+          </div>
+        )}
+        <div className="flex justify-between font-bold border-t border-white/20 pt-1">
+          <span>Total (INR)</span>
+          <span>₹{fmt(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+})()}
+
+        <StatCard title="Available Details" value={stats?.availableLimit || 0} index={4} />
+        <StatCard title="Total Used" value={stats?.totalUsedLimit || 0} index={5} />
+        <StatCard title="Pending" value={stats?.totalPending || 0} prefix="" index={6} />
+        <StatCard title="Picked / In Process" value={stats?.totalPicked || 0} prefix="" index={7} />
+        <StatCard title="Cleared" value={stats?.totalCleared || 0} prefix="" index={0} />
+        <StatCard title="Merchants" value={stats?.merchantCount || 0} prefix="" index={1} />
+        <StatCard title="Agents" value={stats?.agentCount || 0} prefix="" index={2} />
+        <StatCard title="Collectors" value={stats?.collectorCount || 0} prefix="" index={3} />
       </div>
     </div>
   );

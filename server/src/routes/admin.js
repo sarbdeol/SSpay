@@ -78,15 +78,12 @@ router.get("/dashboard", async (req, res) => {
     const tu = parseFloat(usedLimit._sum.usedLimit || 0);
     const availableLimit = parseFloat(pendingAvailable._sum.amount || 0);
     const totalCleared = parseFloat(clearedAgg._sum.amount || 0);
-    const totalAgentCommission = parseFloat(
-      agentCommAgg._sum.agentCommission || 0,
-    );
-    const totalAdminCommission = parseFloat(
-      adminComm._sum.adminCommission || 0,
-    );
+    const totalAgentCommission = parseFloat(agentCommAgg._sum.agentCommission || 0);
+    const totalAdminCommission = parseFloat(adminComm._sum.adminCommission || 0);
 
-    // Get rate for currency conversion
+    // Get global rate config
     const rateConfig = await prisma.rateConfig.findFirst({
+      where: { adminId },
       orderBy: { updatedAt: "desc" },
     });
     const aedRate = parseFloat(rateConfig?.aedTodayRate || 1);
@@ -117,6 +114,70 @@ router.get("/dashboard", async (req, res) => {
     const totalLena = totalCleared - merchantSettledInr;
     const totalDena = totalCleared - totalAgentCommission - agentSettledInr;
 
+    // ── Rate Difference Calculation ──
+    const [merchantRates, agentRates, clearedTxns] = await Promise.all([
+      prisma.rateConfig.findMany({
+        where: { merchantId: { not: null }, adminId },
+        select: { merchantId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.rateConfig.findMany({
+        where: { agentId: { not: null }, adminId },
+        select: { agentId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.transaction.findMany({
+        where: { ...txWhere, status: "CLEARED" },
+        select: { amount: true, merchantId: true, agentId: true },
+      }),
+    ]);
+
+    // Build latest rate lookup maps
+    const merchantRateMap = {};
+    merchantRates.forEach((r) => {
+      if (!merchantRateMap[r.merchantId]) merchantRateMap[r.merchantId] = r;
+    });
+    const agentRateMap = {};
+    agentRates.forEach((r) => {
+      if (!agentRateMap[r.agentId]) agentRateMap[r.agentId] = r;
+    });
+
+    let totalAedDiff = 0;
+    let totalAedDiffInr = 0;
+    let totalUsdtDiff = 0;
+    let totalUsdtDiffInr = 0;
+
+    clearedTxns.forEach((tx) => {
+      const amt = parseFloat(tx.amount || 0);
+      const mRate = merchantRateMap[tx.merchantId];
+      const aRate = tx.agentId ? agentRateMap[tx.agentId] : null;
+
+      const mAed = parseFloat(mRate?.aedTodayRate || aedRate);
+      const aAed = parseFloat(aRate?.aedTodayRate || aedRate);
+      const mUsdt = parseFloat(mRate?.usdtTodayRate || usdtRate);
+      const aUsdt = parseFloat(aRate?.usdtTodayRate || usdtRate);
+
+      // AED diff: (INR ÷ merchantAedRate) - (INR ÷ agentAedRate) = extra AED
+      if (mAed > 0 && aAed > 0) {
+        const lenaAed = amt / mAed;
+        const denaAed = amt / aAed;
+        const diffAed = lenaAed - denaAed;
+        totalAedDiff += diffAed;
+        totalAedDiffInr += diffAed * mAed; // convert back to INR at merchant rate
+      }
+
+      // USDT diff: same logic
+      if (mUsdt > 0 && aUsdt > 0) {
+        const lenaUsdt = amt / mUsdt;
+        const denaUsdt = amt / aUsdt;
+        const diffUsdt = lenaUsdt - denaUsdt;
+        totalUsdtDiff += diffUsdt;
+        totalUsdtDiffInr += diffUsdt * mUsdt;
+      }
+    });
+
+    const totalCommissionCard = totalAdminCommission + totalAedDiffInr + totalUsdtDiffInr;
+
     res.json({
       success: true,
       data: {
@@ -138,6 +199,11 @@ router.get("/dashboard", async (req, res) => {
         merchantCount: mC,
         agentCount: aC,
         collectorCount: cC,
+        totalAedDiff,
+        totalAedDiffInr,
+        totalUsdtDiff,
+        totalUsdtDiffInr,
+        totalCommissionCard,
       },
     });
   } catch (error) {

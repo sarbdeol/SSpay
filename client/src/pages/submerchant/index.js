@@ -19,85 +19,207 @@ function ReceiptImageModal({ transaction, onClose }) {
   const handleSaveImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
       a.href = url;
       a.download = `receipt-${transaction.id}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      toast.success('Image saved!');
-    } catch (e) { toast.error('Save failed.'); }
+      toast.success("Image saved!");
+    } catch (e) {
+      toast.error("Save failed.");
+    }
   };
 
   const handleShare = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+      });
       canvas.toBlob(async (blob) => {
-        const file = new File([blob], `receipt-${transaction.id}.png`, { type: 'image/png' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: `Receipt #${transaction.id}` });
+        const file = new File([blob], `receipt-${transaction.id}.png`, {
+          type: "image/png",
+        });
+        if (
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
+          await navigator.share({
+            files: [file],
+            title: `Receipt #${transaction.id}`,
+          });
         } else {
           const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
+          const a = document.createElement("a");
           a.href = url;
           a.download = `receipt-${transaction.id}.png`;
           a.click();
-          toast.success('Image saved! Share from gallery.');
+          toast.success("Image saved! Share from gallery.");
         }
-      }, 'image/png');
-    } catch (e) { toast.error('Share failed.'); }
+      }, "image/png");
+    } catch (e) {
+      toast.error("Share failed.");
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-sm w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div ref={receiptRef}>
-          <div style={{ background: '#1a1a2e', padding: '20px 24px', borderRadius: '16px 16px 0 0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            style={{
+              background: "#1a1a2e",
+              padding: "20px 24px",
+              borderRadius: "16px 16px 0 0",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <div>
-                <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>SS PAY</div>
-                <div style={{ color: '#aeaeb2', fontSize: '12px', marginTop: '2px' }}>Payment Receipt</div>
+                <div
+                  style={{
+                    color: "#fff",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  SS PAY
+                </div>
+                <div
+                  style={{
+                    color: "#aeaeb2",
+                    fontSize: "12px",
+                    marginTop: "2px",
+                  }}
+                >
+                  Payment Receipt
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ color: '#fff', fontSize: '13px' }}>#{transaction.id}</div>
-                <div style={{ color: '#34d399', fontSize: '11px', fontWeight: 'bold' }}>{transaction.status}</div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: "#fff", fontSize: "13px" }}>
+                  #{transaction.id}
+                </div>
+                <div
+                  style={{
+                    color: "#34d399",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {transaction.status}
+                </div>
               </div>
             </div>
           </div>
-          <div style={{ background: '#f0fdf4', padding: '16px 24px', textAlign: 'center' }}>
-            <div style={{ color: '#166534', fontSize: '12px' }}>Amount</div>
-            <div style={{ color: '#166534', fontSize: '28px', fontWeight: 'bold' }}>₹{parseFloat(transaction.amount).toLocaleString()}</div>
+          <div
+            style={{
+              background: "#f0fdf4",
+              padding: "16px 24px",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ color: "#166534", fontSize: "12px" }}>Amount</div>
+            <div
+              style={{ color: "#166534", fontSize: "28px", fontWeight: "bold" }}
+            >
+              ₹{parseFloat(transaction.amount).toLocaleString()}
+            </div>
           </div>
-          <div style={{ padding: '16px 24px' }}>
+          <div style={{ padding: "16px 24px" }}>
             {[
-              ['Type', transaction.transactionType],
-              ['UPI ID', transaction.upiId || '-'],
-              ['Account', transaction.accountNumber || '-'],
-              ['IFSC', transaction.ifscCode || '-'],
-              ['Holder', transaction.accountHolderName || '-'],
-              ['UTR Number', transaction.utrNumber || '-'],
-              ['Remark', transaction.notes || '-'],
-              ['Created', new Date(transaction.createdAt).toLocaleString()],
-              ['Cleared', transaction.transactionClearTime ? new Date(transaction.transactionClearTime).toLocaleString() : '-'],
+              ["Type", transaction.transactionType],
+              ["UPI ID", transaction.upiId || "-"],
+              ["Account", transaction.accountNumber || "-"],
+              ["IFSC", transaction.ifscCode || "-"],
+              ["Holder", transaction.accountHolderName || "-"],
+              ["UTR Number", transaction.utrNumber || "-"],
+              ["Remark", transaction.notes || "-"],
+              ["Created", new Date(transaction.createdAt).toLocaleString()],
+              [
+                "Cleared",
+                transaction.transactionClearTime
+                  ? new Date(transaction.transactionClearTime).toLocaleString()
+                  : "-",
+              ],
             ].map(([label, value]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: '12px' }}>
-                <span style={{ color: '#9ca3af' }}>{label}</span>
-                <span style={{ color: '#1f2937', fontWeight: '600', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+              <div
+                key={label}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "6px 0",
+                  borderBottom: "1px solid #f3f4f6",
+                  fontSize: "12px",
+                }}
+              >
+                <span style={{ color: "#9ca3af" }}>{label}</span>
+                <span
+                  style={{
+                    color: "#1f2937",
+                    fontWeight: "600",
+                    maxWidth: "60%",
+                    textAlign: "right",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {value}
+                </span>
               </div>
             ))}
           </div>
-          <div style={{ padding: '12px 24px 20px', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
-            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>System generated receipt</div>
-            <div style={{ color: '#aeaeb2', fontSize: '10px' }}>© 2026 SS PAY</div>
+          <div
+            style={{
+              padding: "12px 24px 20px",
+              textAlign: "center",
+              borderTop: "1px solid #e5e7eb",
+            }}
+          >
+            <div style={{ color: "#aeaeb2", fontSize: "10px" }}>
+              System generated receipt
+            </div>
+            <div style={{ color: "#aeaeb2", fontSize: "10px" }}>
+              © 2026 SS PAY
+            </div>
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t border-gray-100">
-          <button onClick={handleSaveImage} className="flex-1 h-11 bg-emerald-500 text-white text-sm font-semibold rounded-xl hover:bg-emerald-600">Save Image</button>
-          <button onClick={handleShare} className="flex-1 h-11 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600">Share</button>
-          <button onClick={onClose} className="h-11 px-4 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200">Close</button>
+          <button
+            onClick={handleSaveImage}
+            className="flex-1 h-11 bg-emerald-500 text-white text-sm font-semibold rounded-xl hover:bg-emerald-600"
+          >
+            Save Image
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex-1 h-11 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600"
+          >
+            Share
+          </button>
+          <button
+            onClick={onClose}
+            className="h-11 px-4 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -150,19 +272,32 @@ export function SubMerchantLedger() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get("/submerchant/transactions", { params: { status: "CLEARED", startDate: selectedDate, endDate: selectedDate, limit: 1000 } }),
+      api.get("/submerchant/transactions", {
+        params: {
+          status: "CLEARED",
+          startDate: selectedDate,
+          endDate: selectedDate,
+          limit: 1000,
+        },
+      }),
       api.get("/config/current-rates"),
-    ]).then(([txRes, rateRes]) => {
-      setTransactions(txRes.data.data || []);
-      const r = rateRes.data.data?.[0];
-      if (r) setRates({ aedTodayRate: parseFloat(r.aedTodayRate || 1) });
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    ])
+      .then(([txRes, rateRes]) => {
+        setTransactions(txRes.data.data || []);
+        const r = rateRes.data.data?.[0];
+        if (r) setRates({ aedTodayRate: parseFloat(r.aedTodayRate || 1) });
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [selectedDate]);
 
   const { aedTodayRate } = rates;
-  const toAed = (inr) => aedTodayRate > 0 ? inr / aedTodayRate : 0;
-  const fmt = (n) => parseFloat(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const toAed = (inr) => (aedTodayRate > 0 ? inr / aedTodayRate : 0);
+  const fmt = (n) =>
+    parseFloat(n).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   const grandINR = transactions.reduce((s, tx) => s + parseFloat(tx.amount), 0);
   const grandAED = toAed(grandINR);
@@ -174,54 +309,119 @@ export function SubMerchantLedger() {
       <div className="flex items-center justify-between mb-4">
         <PageHeader title="Ledger" />
         <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">Select Date</label>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac" />
+          <label className="text-xs font-medium text-gray-500 mb-1 block">
+            Select Date
+          </label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 transition-mac"
+          />
         </div>
       </div>
 
       <div className="bg-brand-500 text-white text-center py-3 rounded-t-xl font-bold text-lg">
-        DAILY LEDGER ({new Date(selectedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, "-")})
+        DAILY LEDGER (
+        {new Date(selectedDate)
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+          .replace(/\//g, "-")}
+        )
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-b-xl">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-50">
-              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">SR.</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">NAME</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">A/C NO.</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">IFSC CODE</th>
-              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">UTR</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">RATE</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (INR)</th>
-              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">AMOUNT (AED)</th>
+              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-12">
+                SR.
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                NAME
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                A/C NO.
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                IFSC CODE
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+                UTR
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                RATE
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                AMOUNT (INR)
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                AMOUNT (AED)
+              </th>
             </tr>
           </thead>
           <tbody>
             {transactions.length === 0 ? (
-              <tr><td colSpan={8} className="border border-gray-200 px-3 py-6 text-center text-gray-400">No cleared transactions for this date.</td></tr>
+              <tr>
+                <td
+                  colSpan={8}
+                  className="border border-gray-200 px-3 py-6 text-center text-gray-400"
+                >
+                  No cleared transactions for this date.
+                </td>
+              </tr>
             ) : (
               transactions.map((tx, idx) => {
                 const inr = parseFloat(tx.amount);
                 return (
-                  <tr key={tx.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-500">{idx + 1}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-800">{tx.accountHolderName || tx.notes || '-'}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.accountNumber || '-'}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.ifscCode || '-'}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">{tx.utrNumber || '-'}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-600">{aedTodayRate}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium">₹{fmt(inr)}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-700">{fmt(toAed(inr))}</td>
+                  <tr
+                    key={tx.id}
+                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    <td className="border border-gray-200 px-3 py-1.5 text-center text-gray-500">
+                      {idx + 1}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-800">
+                      {tx.accountHolderName || tx.notes || "-"}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">
+                      {tx.accountNumber || "-"}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">
+                      {tx.ifscCode || "-"}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-gray-600">
+                      {tx.utrNumber || "-"}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-600">
+                      {aedTodayRate}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium">
+                      ₹{fmt(inr)}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-700">
+                      {fmt(toAed(inr))}
+                    </td>
                   </tr>
                 );
               })
             )}
             <tr className="bg-brand-500 text-white font-bold">
-              <td className="border border-gray-300 px-3 py-2 text-center" colSpan={6}>TOTAL</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">₹{fmt(grandINR)}</td>
-              <td className="border border-gray-300 px-3 py-2 text-right">{fmt(grandAED)}</td>
+              <td
+                className="border border-gray-300 px-3 py-2 text-center"
+                colSpan={6}
+              >
+                TOTAL
+              </td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                ₹{fmt(grandINR)}
+              </td>
+              <td className="border border-gray-300 px-3 py-2 text-right">
+                {fmt(grandAED)}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -393,15 +593,21 @@ export function SubMerchantTransactions() {
         columns={[
           { header: "ID", key: "id" },
           {
+            header: "Account Holder Name",
+            render: (r) => r.accountHolderName || "-",
+          },
+          { header: "Type", key: "transactionType" },
+          {
+            header: "UPI ID / Account No.",
+            render: (r) => r.upiId || r.accountNumber || "-",
+          },
+          { header: "IFSC Code", render: (r) => r.ifscCode || "-" },
+          {
             header: "Amount",
             render: (r) => `₹${parseFloat(r.amount).toLocaleString()}`,
           },
+          { header: "Remark", render: (r) => r.notes || "-" },
           { header: "UTR", render: (r) => r.utrNumber || "-" },
-          { header: "UPI ID", render: (r) => r.upiId || "-" },
-          { header: "Bank", render: (r) => r.bankName || "-" },
-          { header: "IFSC", render: (r) => r.ifscCode || "-" },
-          { header: "Holder", render: (r) => r.accountHolderName || "-" },
-          { header: "Remark", render: (r) => r.notes || "-" }, // ✅ show remark
           {
             header: "Created",
             render: (r) => new Date(r.createdAt).toLocaleString(),
@@ -498,9 +704,12 @@ export function SubMerchantTransactions() {
           </Button>
         </form>
       </Modal>
-    {showReceipt && <ReceiptImageModal transaction={showReceipt} onClose={() => setShowReceipt(null)} />}
+      {showReceipt && (
+        <ReceiptImageModal
+          transaction={showReceipt}
+          onClose={() => setShowReceipt(null)}
+        />
+      )}
     </div>
   );
 }
-
-
