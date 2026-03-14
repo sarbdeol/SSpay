@@ -1000,8 +1000,22 @@ router.get("/ledger", async (req, res) => {
     ] = await Promise.all([
       prisma.transaction.groupBy({ by: ["merchantId"], where: txWhere, _sum: { amount: true } }),
       prisma.transaction.groupBy({ by: ["agentId"], where: txWhere, _sum: { amount: true, agentCommission: true } }),
-      prisma.settlement.findMany({ where: { merchant: { adminId }, status: "CONFIRMED" }, select: { merchantId: true, amount: true, currency: true } }),
-      prisma.settlement.findMany({ where: { agent: { adminId }, status: "CONFIRMED" }, select: { agentId: true, amount: true, currency: true } }),
+      prisma.settlement.findMany({ 
+  where: { 
+    merchant: { adminId }, 
+    status: "CONFIRMED",
+    ...(startDate || endDate ? { updatedAt: dateFilter } : {}),
+  }, 
+  select: { merchantId: true, amount: true, currency: true } 
+}),
+prisma.settlement.findMany({ 
+  where: { 
+    agent: { adminId }, 
+    status: "CONFIRMED",
+    ...(startDate || endDate ? { updatedAt: dateFilter } : {}),
+  }, 
+  select: { agentId: true, amount: true, currency: true } 
+}),
       prisma.rateConfig.findMany({ where: { merchantId: { not: null }, adminId }, orderBy: { updatedAt: "desc" } }),
       prisma.rateConfig.findMany({ where: { agentId: { not: null }, adminId }, orderBy: { updatedAt: "desc" } }),
       prisma.agent.findMany({ where: { adminId }, select: { id: true, name: true } }),

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { fmt } from "../../utils/fmt";
 import api from "../../utils/api";
 import {
   StatCard,
@@ -18,11 +19,7 @@ export function CollectorDashboard() {
     api.get("/collector/dashboard").then((r) => setStats(r.data.data));
   }, []);
 
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+ 
 
   return (
     <div>
@@ -253,7 +250,7 @@ export function CollectorLedger() {
       .catch(() => setLoading(false));
   }, [selectedDate]);
 
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const isMerchant = view === "merchant";
   const rows = isMerchant ? merchantLedger : agentLedger;
@@ -264,7 +261,8 @@ export function CollectorLedger() {
   const grandSettled = filteredRows.reduce((s, r) => s + r.settled, 0);
   const grandSettledAed = filteredRows.reduce((s, r) => s + r.settledAed, 0);
   const grandTotal = filteredRows.reduce((s, r) => s + r.total, 0);
-  const grandTotalAed = grandTotal / (summary?.aedRate || 1);
+  const grandTotalAed = filteredRows.reduce((s, r) => s + (r.aedRate > 0 ? r.total / r.aedRate : 0), 0);
+
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
@@ -340,7 +338,7 @@ export function CollectorLedger() {
                   <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">{row.name.toUpperCase()}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">{row.aedRate}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">₹{fmt(row.total)}</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">{fmt(row.total / (summary?.aedRate || 1))}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">{fmt(row.aedRate > 0 ? row.total / row.aedRate : 0)}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-green-600 bg-green-50">{fmt(row.settledAed)}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-semibold text-red-600 bg-red-50">{fmt(row.pendingAed)}</td>
                 </tr>
@@ -421,13 +419,7 @@ export function CollectorTrialBalance() {
     fetchData();
   }, []);
 
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  const fmtInt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0 });
+  
   const toAed = (inr) => (aedRate > 0 ? inr / aedRate : 0);
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
@@ -521,7 +513,7 @@ export function CollectorTrialBalance() {
                   {lena[i]?.name || ""}
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-600">
-                  {lena[i] ? fmtInt(lena[i].pending) : ""}
+                  {lena[i] ? fmt(lena[i].pending) : ""}
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-400">
                   {lena[i] ? fmt(toAed(lena[i].pending)) : ""}
@@ -539,9 +531,9 @@ export function CollectorTrialBalance() {
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-blue-700">
                   {i < dena.length
-                    ? fmtInt(dena[i].pending)
+                    ? fmt(dena[i].pending)
                     : i === dena.length
-                      ? fmtInt(adminComm)
+                      ? fmt(adminComm)
                       : ""}
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-blue-500">
@@ -558,7 +550,7 @@ export function CollectorTrialBalance() {
                 Total Lena (Pending)
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
-                <div>{fmtInt(totalLena)}</div>
+                <div>{fmt(totalLena)}</div>
                 <div className="text-xs font-normal opacity-90">
                   AED {fmt(toAed(totalLena))}
                 </div>
@@ -567,7 +559,7 @@ export function CollectorTrialBalance() {
                 Total Dena + Commission
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
-                <div>{fmtInt(totalDenaWithComm)}</div>
+                <div>{fmt(totalDenaWithComm)}</div>
                 <div className="text-xs font-normal opacity-90">
                   AED {fmt(toAed(totalDenaWithComm))}
                 </div>

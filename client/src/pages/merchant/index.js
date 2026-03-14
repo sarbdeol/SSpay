@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { fmt } from "../../utils/fmt";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -32,11 +33,7 @@ export function MerchantDashboard() {
 
   const { aedTodayRate } = rates;
   const toAed = (n) => (aedTodayRate > 0 ? n / aedTodayRate : 0);
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+
 
   return (
     <div>
@@ -775,11 +772,7 @@ export function MerchantLedger() {
     0,
   );
   const grandBalance = grandINR - grandCommission;
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 

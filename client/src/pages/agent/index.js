@@ -2,6 +2,7 @@
 // AGENT PAGES
 // ═══════════════════════════════════════════
 import React, { useState, useEffect } from "react";
+import { fmt } from "../../utils/fmt";
 import api from "../../utils/api";
 import {
   StatCard,
@@ -37,11 +38,7 @@ export function AgentDashboard() {
     });
   }, []);
 
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+
   const { aedTodayRate, usdtTodayRate } = rates;
 
   const settledInr =
@@ -857,11 +854,7 @@ export function AgentLedger() {
   const totalSettledInr =
     totalSettledAed * aedTodayRate + totalSettledUsdt * usdtTodayRate;
   const netBalance = grandBalance - totalSettledInr;
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 

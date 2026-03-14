@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { fmt } from "../../utils/fmt";
 import api from "../../utils/api";
 import {
   StatCard,
@@ -21,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 // ADMIN DASHBOARD
 // ═══════════════════════════════════════════
 function AdminCommissionCard({ stats }) {
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
   const hasAed = (stats?.merchantSettledAed || 0) > 0 || (stats?.agentSettledAed || 0) > 0;
   const hasUsdt = (stats?.merchantSettledUsdt || 0) > 0 || (stats?.agentSettledUsdt || 0) > 0;
@@ -79,7 +80,7 @@ export function AdminDashboard() {
     fetchStats();
   }, [fetchStats]);
 
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
   return (
     <div>
@@ -1749,7 +1750,7 @@ export function AdminLedger() {
       .catch(() => setLoading(false));
   }, [selectedDate]);
 
-  const fmt = (n) => parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
   const isMerchant = view === "merchant";
   const rows = isMerchant ? merchantLedger : agentLedger;
@@ -1836,7 +1837,7 @@ export function AdminLedger() {
                   <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">{row.name.toUpperCase()}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right text-gray-500">{row.aedRate}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">₹{fmt(row.total)}</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">{fmt(grandTotalAed / filteredRows.length * (row.total / (grandTotal || 1)) * filteredRows.length)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">{fmt(row.aedRate > 0 ? row.total / row.aedRate : 0)}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-green-600 bg-green-50">{fmt(row.settledAed)}</td>
                   <td className="border border-gray-200 px-3 py-1.5 text-right font-semibold text-red-600 bg-red-50">{fmt(row.pendingAed)}</td>
                 </tr>
@@ -1929,13 +1930,7 @@ export function AdminTrialBalance() {
   );
 
   const toAed = (inr) => (aedRate > 0 ? inr / aedRate : 0);
-  const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  const fmtInt = (n) =>
-    parseFloat(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0 });
+
 
   const adminComm = parseFloat(data?.totalAdminCommission || 0);
   const totalCredit = credit.reduce(
@@ -2044,9 +2039,9 @@ export function AdminTrialBalance() {
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
                   {i < credit.length
-                    ? fmtInt(credit[i].pending)
+                    ? fmt(credit[i].pending)
                     : i === credit.length
-                      ? fmtInt(adminComm)
+                      ? fmt(adminComm)
                       : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-500">
@@ -2060,7 +2055,7 @@ export function AdminTrialBalance() {
                   {debit[i]?.name || ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-600">
-                  {debit[i] ? fmtInt(debit[i].pending) : ""}
+                  {debit[i] ? fmt(debit[i].pending) : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-400">
                   {debit[i] ? fmt(toAed(debit[i].pending)) : ""}
@@ -2072,7 +2067,7 @@ export function AdminTrialBalance() {
                 Total Dena + Commission
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
-                <div>{fmtInt(totalCreditWithComm)}</div>
+                <div>{fmt(totalCreditWithComm)}</div>
                 <div className="text-xs font-normal opacity-90">
                   AED {fmt(toAed(totalCreditWithComm))}
                 </div>
@@ -2081,7 +2076,7 @@ export function AdminTrialBalance() {
                 Total Lena (Pending)
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
-                <div>{fmtInt(totalDebit)}</div>
+                <div>{fmt(totalDebit)}</div>
                 <div className="text-xs font-normal opacity-90">
                   AED {fmt(toAed(totalDebit))}
                 </div>

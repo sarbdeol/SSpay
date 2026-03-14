@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
+import { fmt } from "../../utils/fmt";
 import api from "../../utils/api";
 import {
   StatCard,
@@ -293,11 +294,7 @@ export function SubMerchantLedger() {
 
   const { aedTodayRate } = rates;
   const toAed = (inr) => (aedTodayRate > 0 ? inr / aedTodayRate : 0);
-  const fmt = (n) =>
-    parseFloat(n).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+
 
   const grandINR = transactions.reduce((s, tx) => s + parseFloat(tx.amount), 0);
   const grandAED = toAed(grandINR);
