@@ -396,7 +396,6 @@ export function CollectorTrialBalance() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [aedRate, setAedRate] = useState(1);
 
   const fetchData = async () => {
     setLoading(true);
@@ -404,13 +403,8 @@ export function CollectorTrialBalance() {
       const params = {};
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
-      const [r, rateRes] = await Promise.all([
-        api.get("/collector/trial-balance", { params }),
-        api.get("/config/current-rates"),
-      ]);
+      const r = await api.get("/collector/trial-balance", { params });
       setData(r.data.data);
-      const rt = rateRes.data.data?.[0];
-      if (rt) setAedRate(parseFloat(rt.aedTodayRate || 1));
     } catch (e) {}
     setLoading(false);
   };
@@ -418,9 +412,6 @@ export function CollectorTrialBalance() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  
-  const toAed = (inr) => (aedRate > 0 ? inr / aedRate : 0);
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
@@ -432,15 +423,19 @@ export function CollectorTrialBalance() {
   const totalDenaWithComm = totalDena + adminComm;
   const maxRows = Math.max(lena.length, dena.length + 1, 1);
 
+  const toAed = (inr, aedRate) => (aedRate > 1 ? inr / aedRate : 0);
+  const fallbackRate = lena[0]?.aedRate || dena[0]?.aedRate || 0;
+  const totalLenaAed = lena.reduce((s, e) => s + toAed(parseFloat(e.pending) || 0, e.aedRate), 0);
+  const totalDenaAed = dena.reduce((s, e) => s + toAed(parseFloat(e.pending) || 0, e.aedRate), 0);
+  const totalDenaWithCommAed = totalDenaAed + toAed(adminComm, fallbackRate);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <PageHeader title="Trial Balance" />
         <div className="flex gap-2 items-end">
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
-              From
-            </label>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">From</label>
             <input
               type="date"
               value={startDate}
@@ -449,9 +444,7 @@ export function CollectorTrialBalance() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
-              To
-            </label>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
             <input
               type="date"
               value={endDate}
@@ -516,15 +509,13 @@ export function CollectorTrialBalance() {
                   {lena[i] ? fmt(lena[i].pending) : ""}
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-red-400">
-                  {lena[i] ? fmt(toAed(lena[i].pending)) : ""}
+                  {lena[i] ? fmt(toAed(lena[i].pending, lena[i].aedRate)) : ""}
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-gray-800">
                   {i < dena.length ? (
                     dena[i].name
                   ) : i === dena.length ? (
-                    <span className="font-semibold text-purple-700">
-                      ADMIN COMMISSION
-                    </span>
+                    <span className="font-semibold text-purple-700">ADMIN COMMISSION</span>
                   ) : (
                     ""
                   )}
@@ -538,9 +529,9 @@ export function CollectorTrialBalance() {
                 </td>
                 <td className="border border-gray-200 px-3 py-1.5 text-right font-medium text-blue-500">
                   {i < dena.length
-                    ? fmt(toAed(dena[i].pending))
+                    ? fmt(toAed(dena[i].pending, dena[i].aedRate))
                     : i === dena.length
-                      ? fmt(toAed(adminComm))
+                      ? fmt(toAed(adminComm, fallbackRate))
                       : ""}
                 </td>
               </tr>
@@ -551,18 +542,14 @@ export function CollectorTrialBalance() {
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>{fmt(totalLena)}</div>
-                <div className="text-xs font-normal opacity-90">
-                  AED {fmt(toAed(totalLena))}
-                </div>
+                <div className="text-xs font-normal opacity-90">AED {fmt(totalLenaAed)}</div>
               </td>
               <td colSpan={2} className="border border-gray-300 px-3 py-2">
                 Total Dena + Commission
               </td>
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>{fmt(totalDenaWithComm)}</div>
-                <div className="text-xs font-normal opacity-90">
-                  AED {fmt(toAed(totalDenaWithComm))}
-                </div>
+                <div className="text-xs font-normal opacity-90">AED {fmt(totalDenaWithCommAed)}</div>
               </td>
             </tr>
           </tbody>
@@ -571,36 +558,24 @@ export function CollectorTrialBalance() {
 
       <div className="mt-4 flex flex-wrap gap-4 text-sm">
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">
-            Pending Lena (from Merchants)
-          </div>
+          <div className="text-gray-500 text-xs">Pending Lena (from Merchants)</div>
           <div className="font-bold text-red-700">₹{fmt(totalLena)}</div>
-          <div className="text-xs text-red-500 mt-0.5">
-            AED {fmt(toAed(totalLena))}
-          </div>
+          <div className="text-xs text-red-500 mt-0.5">AED {fmt(totalLenaAed)}</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Pending Dena (to Agents)</div>
           <div className="font-bold text-blue-700">₹{fmt(totalDena)}</div>
-          <div className="text-xs text-blue-500 mt-0.5">
-            AED {fmt(toAed(totalDena))}
-          </div>
+          <div className="text-xs text-blue-500 mt-0.5">AED {fmt(totalDenaAed)}</div>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Admin Commission</div>
           <div className="font-bold text-purple-700">₹{fmt(adminComm)}</div>
-          <div className="text-xs text-purple-500 mt-0.5">
-            AED {fmt(toAed(adminComm))}
-          </div>
+          <div className="text-xs text-purple-500 mt-0.5">AED {fmt(toAed(adminComm, fallbackRate))}</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Total Dena + Commission</div>
-          <div className="font-bold text-blue-700">
-            ₹{fmt(totalDenaWithComm)}
-          </div>
-          <div className="text-xs text-blue-500 mt-0.5">
-            AED {fmt(toAed(totalDenaWithComm))}
-          </div>
+          <div className="font-bold text-blue-700">₹{fmt(totalDenaWithComm)}</div>
+          <div className="text-xs text-blue-500 mt-0.5">AED {fmt(totalDenaWithCommAed)}</div>
         </div>
       </div>
     </div>

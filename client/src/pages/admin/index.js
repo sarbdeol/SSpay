@@ -1732,7 +1732,7 @@ export function AdminLedger() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
-  const [view, setView] = useState("merchant"); // merchant | agent
+  const [view, setView] = useState("merchant");
   const [selectedName, setSelectedName] = useState("");
 
   useEffect(() => {
@@ -1750,8 +1750,6 @@ export function AdminLedger() {
       .catch(() => setLoading(false));
   }, [selectedDate]);
 
-
-
   const isMerchant = view === "merchant";
   const rows = isMerchant ? merchantLedger : agentLedger;
   const filteredRows = rows.filter((r) => !selectedName || r.name === selectedName);
@@ -1761,7 +1759,12 @@ export function AdminLedger() {
   const grandSettled = filteredRows.reduce((s, r) => s + r.settled, 0);
   const grandSettledAed = filteredRows.reduce((s, r) => s + r.settledAed, 0);
   const grandTotal = filteredRows.reduce((s, r) => s + r.total, 0);
-  const grandTotalAed = grandTotal / (summary?.aedRate || 1);
+
+  // ✅ FIXED: sum per-row AED instead of using missing summary.aedRate
+  const grandTotalAed = filteredRows.reduce(
+    (s, r) => s + (r.aedRate > 0 ? r.total / r.aedRate : 0),
+    0
+  );
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
@@ -1779,7 +1782,6 @@ export function AdminLedger() {
             className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500" />
         </div>
 
-        {/* Lena / Dena Toggle */}
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">View</label>
           <div className="flex border border-gray-200 rounded-lg overflow-hidden h-9">
@@ -1794,7 +1796,6 @@ export function AdminLedger() {
           </div>
         </div>
 
-        {/* Name filter */}
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">{isMerchant ? "Merchant" : "Agent"}</label>
           <select value={selectedName} onChange={(e) => setSelectedName(e.target.value)}
@@ -1899,20 +1900,18 @@ export function AdminTrialBalance() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [search, setSearch] = useState("");
-  const [aedRate, setAedRate] = useState(1);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
-    const [r, rateRes] = await Promise.all([
-      api.get("/admin/trial-balance", { params }),
-      api.get("/config/current-rates"),
-    ]);
-    setData(r.data.data);
-    const rt = rateRes.data.data?.[0];
-    if (rt) setAedRate(parseFloat(rt.aedTodayRate || 1));
+    try {
+      const r = await api.get("/admin/trial-balance", { params });
+      setData(r.data.data);
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   }, [startDate, endDate]);
 
@@ -1929,19 +1928,24 @@ export function AdminTrialBalance() {
     (e) => !search || e.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const toAed = (inr) => (aedRate > 0 ? inr / aedRate : 0);
+  // ✅ per-entity rate
+  const toAed = (inr, aedRate) => (aedRate > 1 ? inr / aedRate : 0);
+
+  // ✅ fallback rate for admin commission
+  const fallbackRate = debit[0]?.aedRate || credit[0]?.aedRate || 0;
 
 
   const adminComm = parseFloat(data?.totalAdminCommission || 0);
-  const totalCredit = credit.reduce(
-    (s, e) => s + (parseFloat(e.pending) || 0),
-    0,
-  );
-  const totalDebit = debit.reduce(
-    (s, e) => s + (parseFloat(e.pending) || 0),
-    0,
-  );
+
+  const totalCredit = credit.reduce((s, e) => s + (parseFloat(e.pending) || 0), 0);
+  const totalDebit = debit.reduce((s, e) => s + (parseFloat(e.pending) || 0), 0);
   const totalCreditWithComm = totalCredit + adminComm;
+
+  // ✅ AED totals using per-entity rates
+  const totalCreditAed = credit.reduce((s, e) => s + toAed(parseFloat(e.pending) || 0, e.aedRate), 0);
+  const totalDebitAed = debit.reduce((s, e) => s + toAed(parseFloat(e.pending) || 0, e.aedRate), 0);
+  const totalCreditWithCommAed = totalCreditAed + toAed(adminComm, fallbackRate);
+
   const maxRows = Math.max(credit.length + 1, debit.length, 1);
 
   return (
@@ -1989,38 +1993,20 @@ export function AdminTrialBalance() {
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th
-                colSpan={3}
-                className="border border-gray-300 bg-blue-50 px-3 py-2 text-center font-bold text-blue-800"
-              >
+              <th colSpan={3} className="border border-gray-300 bg-blue-50 px-3 py-2 text-center font-bold text-blue-800">
                 Credit / Jama / Dena (Agent Ko Dena)
               </th>
-              <th
-                colSpan={3}
-                className="border border-gray-300 bg-red-50 px-3 py-2 text-center font-bold text-red-800"
-              >
+              <th colSpan={3} className="border border-gray-300 bg-red-50 px-3 py-2 text-center font-bold text-red-800">
                 Debit / Nama / Lena (Merchant Se Lena)
               </th>
             </tr>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Agent
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (INR)
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (AED)
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                Merchant
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (INR)
-              </th>
-              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
-                Amount (AED)
-              </th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Agent</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (INR)</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (AED)</th>
+              <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">Merchant</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (INR)</th>
+              <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">Amount (AED)</th>
             </tr>
           </thead>
           <tbody>
@@ -2030,12 +2016,8 @@ export function AdminTrialBalance() {
                   {i < credit.length ? (
                     credit[i].name
                   ) : i === credit.length ? (
-                    <span className="font-semibold text-purple-700">
-                      ADMIN COMMISSION
-                    </span>
-                  ) : (
-                    ""
-                  )}
+                    <span className="font-semibold text-purple-700">ADMIN COMMISSION</span>
+                  ) : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-700">
                   {i < credit.length
@@ -2046,9 +2028,9 @@ export function AdminTrialBalance() {
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-blue-500">
                   {i < credit.length
-                    ? fmt(toAed(credit[i].pending))
+                    ? fmt(toAed(credit[i].pending, credit[i].aedRate))
                     : i === credit.length
-                      ? fmt(toAed(adminComm))
+                      ? fmt(toAed(adminComm, fallbackRate))
                       : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
@@ -2058,7 +2040,7 @@ export function AdminTrialBalance() {
                   {debit[i] ? fmt(debit[i].pending) : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-right font-medium text-red-400">
-                  {debit[i] ? fmt(toAed(debit[i].pending)) : ""}
+                  {debit[i] ? fmt(toAed(debit[i].pending, debit[i].aedRate)) : ""}
                 </td>
               </tr>
             ))}
@@ -2069,7 +2051,7 @@ export function AdminTrialBalance() {
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>{fmt(totalCreditWithComm)}</div>
                 <div className="text-xs font-normal opacity-90">
-                  AED {fmt(toAed(totalCreditWithComm))}
+                  AED {fmt(totalCreditWithCommAed)}
                 </div>
               </td>
               <td colSpan={2} className="border border-gray-300 px-3 py-2">
@@ -2078,7 +2060,7 @@ export function AdminTrialBalance() {
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>{fmt(totalDebit)}</div>
                 <div className="text-xs font-normal opacity-90">
-                  AED {fmt(toAed(totalDebit))}
+                  AED {fmt(totalDebitAed)}
                 </div>
               </td>
             </tr>
@@ -2088,52 +2070,32 @@ export function AdminTrialBalance() {
 
       <div className="mt-4 flex flex-wrap gap-4 text-sm">
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">
-            Total Dena to Agents (INR)
-          </div>
+          <div className="text-gray-500 text-xs">Total Dena to Agents (INR)</div>
           <div className="font-bold text-blue-700">₹{fmt(totalCredit)}</div>
-          <div className="text-xs text-blue-500 mt-0.5">
-            AED {fmt(toAed(totalCredit))}
-          </div>
+          <div className="text-xs text-blue-500 mt-0.5">AED {fmt(totalCreditAed)}</div>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Admin Commission (INR)</div>
           <div className="font-bold text-purple-700">₹{fmt(adminComm)}</div>
-          <div className="text-xs text-purple-500 mt-0.5">
-            AED {fmt(toAed(adminComm))}
-          </div>
+          <div className="text-xs text-purple-500 mt-0.5">AED {fmt(toAed(adminComm, fallbackRate))}</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">
-            Total Dena + Commission (INR)
-          </div>
-          <div className="font-bold text-blue-700">
-            ₹{fmt(totalCreditWithComm)}
-          </div>
-          <div className="text-xs text-blue-500 mt-0.5">
-            AED {fmt(toAed(totalCreditWithComm))}
-          </div>
+          <div className="text-gray-500 text-xs">Total Dena + Commission (INR)</div>
+          <div className="font-bold text-blue-700">₹{fmt(totalCreditWithComm)}</div>
+          <div className="text-xs text-blue-500 mt-0.5">AED {fmt(totalCreditWithCommAed)}</div>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <div className="text-gray-500 text-xs">
-            Total Lena from Merchants (INR)
-          </div>
+          <div className="text-gray-500 text-xs">Total Lena from Merchants (INR)</div>
           <div className="font-bold text-red-700">₹{fmt(totalDebit)}</div>
-          <div className="text-xs text-red-500 mt-0.5">
-            AED {fmt(toAed(totalDebit))}
-          </div>
+          <div className="text-xs text-red-500 mt-0.5">AED {fmt(totalDebitAed)}</div>
         </div>
-        <div
-          className={`border rounded-xl px-4 py-3 ${totalDebit - totalCreditWithComm === 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}
-        >
+        <div className={`border rounded-xl px-4 py-3 ${totalDebit - totalCreditWithComm === 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
           <div className="text-gray-500 text-xs">Difference (should be 0)</div>
-          <div
-            className={`font-bold ${totalDebit - totalCreditWithComm === 0 ? "text-green-700" : "text-red-700"}`}
-          >
+          <div className={`font-bold ${totalDebit - totalCreditWithComm === 0 ? "text-green-700" : "text-red-700"}`}>
             ₹{fmt(totalDebit - totalCreditWithComm)}
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
-            AED {fmt(toAed(totalDebit - totalCreditWithComm))}
+            AED {fmt(totalDebitAed - totalCreditWithCommAed)}
           </div>
         </div>
       </div>
