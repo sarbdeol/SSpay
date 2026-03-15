@@ -31,6 +31,9 @@ router.get("/dashboard", async (req, res) => {
       pendingAvailable,
       merchantSettledList,
       agentSettledList,
+      merchantRates,   // ← moved here
+      agentRates,      // ← moved here
+      clearedTxns,     // ← moved here
     ] = await Promise.all([
       prisma.transaction.aggregate({
         where: { ...txWhere, status: "CLEARED" },
@@ -66,11 +69,25 @@ router.get("/dashboard", async (req, res) => {
       }),
       prisma.settlement.findMany({
         where: { merchant: { adminId }, status: "CONFIRMED" },
-        select: { amount: true, currency: true },
+        select: { amount: true, currency: true, merchantId: true }, // ← added merchantId
       }),
       prisma.settlement.findMany({
         where: { agent: { adminId }, status: "CONFIRMED" },
-        select: { amount: true, currency: true },
+        select: { amount: true, currency: true, agentId: true }, // ← added agentId
+      }),
+      prisma.rateConfig.findMany({
+        where: { merchantId: { not: null }, adminId },
+        select: { merchantId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.rateConfig.findMany({
+        where: { agentId: { not: null }, adminId },
+        select: { agentId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.transaction.findMany({
+        where: { ...txWhere, status: "CLEARED" },
+        select: { amount: true, merchantId: true, agentId: true },
       }),
     ]);
 
@@ -81,7 +98,17 @@ router.get("/dashboard", async (req, res) => {
     const totalAgentCommission = parseFloat(agentCommAgg._sum.agentCommission || 0);
     const totalAdminCommission = parseFloat(adminComm._sum.adminCommission || 0);
 
-    // Get global rate config
+    // ✅ Build per-entity rate maps
+    const merchantRateMap = {};
+    merchantRates.forEach((r) => {
+      if (!merchantRateMap[r.merchantId]) merchantRateMap[r.merchantId] = r;
+    });
+    const agentRateMap = {};
+    agentRates.forEach((r) => {
+      if (!agentRateMap[r.agentId]) agentRateMap[r.agentId] = r;
+    });
+
+    // ✅ Fallback global rate
     const rateConfig = await prisma.rateConfig.findFirst({
       where: { adminId },
       orderBy: { updatedAt: "desc" },
@@ -89,14 +116,21 @@ router.get("/dashboard", async (req, res) => {
     const aedRate = parseFloat(rateConfig?.aedTodayRate || 1);
     const usdtRate = parseFloat(rateConfig?.usdtTodayRate || 1);
 
-    const calcSettledInr = (list) =>
-      list.reduce((sum, s) => {
-        const amt = parseFloat(s.amount || 0);
-        return sum + (s.currency === "USDT" ? amt * usdtRate : amt * aedRate);
-      }, 0);
+    // ✅ Per-merchant rate for settlements
+    const merchantSettledInr = merchantSettledList.reduce((sum, s) => {
+      const rate = parseFloat(merchantRateMap[s.merchantId]?.aedTodayRate || aedRate);
+      const uRate = parseFloat(merchantRateMap[s.merchantId]?.usdtTodayRate || usdtRate);
+      const amt = parseFloat(s.amount || 0);
+      return sum + (s.currency === "USDT" ? amt * uRate : amt * rate);
+    }, 0);
 
-    const merchantSettledInr = calcSettledInr(merchantSettledList);
-    const agentSettledInr = calcSettledInr(agentSettledList);
+    // ✅ Per-agent rate for settlements
+    const agentSettledInr = agentSettledList.reduce((sum, s) => {
+      const rate = parseFloat(agentRateMap[s.agentId]?.aedTodayRate || aedRate);
+      const uRate = parseFloat(agentRateMap[s.agentId]?.usdtTodayRate || usdtRate);
+      const amt = parseFloat(s.amount || 0);
+      return sum + (s.currency === "USDT" ? amt * uRate : amt * rate);
+    }, 0);
 
     const merchantSettledAed = merchantSettledList
       .filter((s) => s.currency === "AED")
@@ -114,34 +148,7 @@ router.get("/dashboard", async (req, res) => {
     const totalLena = totalCleared - merchantSettledInr;
     const totalDena = totalCleared - totalAgentCommission - agentSettledInr;
 
-    // ── Rate Difference Calculation ──
-    const [merchantRates, agentRates, clearedTxns] = await Promise.all([
-      prisma.rateConfig.findMany({
-        where: { merchantId: { not: null }, adminId },
-        select: { merchantId: true, aedTodayRate: true, usdtTodayRate: true },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.rateConfig.findMany({
-        where: { agentId: { not: null }, adminId },
-        select: { agentId: true, aedTodayRate: true, usdtTodayRate: true },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.transaction.findMany({
-        where: { ...txWhere, status: "CLEARED" },
-        select: { amount: true, merchantId: true, agentId: true },
-      }),
-    ]);
-
-    // Build latest rate lookup maps
-    const merchantRateMap = {};
-    merchantRates.forEach((r) => {
-      if (!merchantRateMap[r.merchantId]) merchantRateMap[r.merchantId] = r;
-    });
-    const agentRateMap = {};
-    agentRates.forEach((r) => {
-      if (!agentRateMap[r.agentId]) agentRateMap[r.agentId] = r;
-    });
-
+    // ✅ Rate Difference Calculation
     let totalAedDiff = 0;
     let totalAedDiffInr = 0;
     let totalUsdtDiff = 0;
@@ -157,16 +164,14 @@ router.get("/dashboard", async (req, res) => {
       const mUsdt = parseFloat(mRate?.usdtTodayRate || usdtRate);
       const aUsdt = parseFloat(aRate?.usdtTodayRate || usdtRate);
 
-      // AED diff: (INR ÷ merchantAedRate) - (INR ÷ agentAedRate) = extra AED
       if (mAed > 0 && aAed > 0) {
         const lenaAed = amt / mAed;
         const denaAed = amt / aAed;
         const diffAed = lenaAed - denaAed;
         totalAedDiff += diffAed;
-        totalAedDiffInr += diffAed * mAed; // convert back to INR at merchant rate
+        totalAedDiffInr += diffAed * mAed;
       }
 
-      // USDT diff: same logic
       if (mUsdt > 0 && aUsdt > 0) {
         const lenaUsdt = amt / mUsdt;
         const denaUsdt = amt / aUsdt;
@@ -700,7 +705,23 @@ router.get("/transactions", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+router.delete("/transactions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const tx = await prisma.transaction.findFirst({
+      where: { id, merchant: { adminId: req.user.adminId } },
+    });
+    if (!tx) return res.status(404).json({ success: false, message: "Not found." });
+    if (tx.status !== "PENDING") return res.status(400).json({ success: false, message: "Only PENDING transactions can be deleted." });
+    await prisma.transaction.delete({ where: { id } });
+    res.json({ success: true, message: "Deleted." });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
 
+module.exports = router;
 // ═══ COLLECTIONS ═══
 router.post("/collections", async (req, res) => {
   try {

@@ -15,14 +15,14 @@ router.get("/dashboard", async (req, res) => {
   try {
     const collectorId = req.user.collectorId;
 
-    // Get collector's adminId to find their merchants
     const collector = await prisma.collector.findUnique({
       where: { id: collectorId },
       select: { adminId: true },
     });
+    const adminId = collector.adminId;
 
     const merchants = await prisma.merchant.findMany({
-      where: { adminId: collector.adminId },
+      where: { adminId },
       select: { id: true },
     });
     const merchantIds = merchants.map((m) => m.id);
@@ -37,33 +37,29 @@ router.get("/dashboard", async (req, res) => {
       merchantConfirmed,
       agentPending,
       agentConfirmed,
+      allMerchantRates,   // ← added
+      allAgentRates,      // ← added
     ] = await Promise.all([
-      // Total cleared transactions for these merchants
       prisma.transaction.aggregate({
         where: { merchantId: { in: merchantIds }, status: "CLEARED" },
         _sum: { amount: true },
       }),
-      // Agent commission on those transactions
       prisma.transaction.aggregate({
         where: { merchantId: { in: merchantIds }, status: "CLEARED" },
         _sum: { agentCommission: true },
       }),
-      // Admin commission on those transactions
       prisma.transaction.aggregate({
         where: { merchantId: { in: merchantIds }, status: "CLEARED" },
         _sum: { adminCommission: true },
       }),
-      // Merchant settlements confirmed
       prisma.settlement.findMany({
         where: { collectorId, merchantId: { not: null }, status: "CONFIRMED" },
-        select: { amount: true, currency: true },
+        select: { amount: true, currency: true, merchantId: true }, // ← added merchantId
       }),
-      // Agent settlements confirmed
       prisma.settlement.findMany({
         where: { collectorId, agentId: { not: null }, status: "CONFIRMED" },
-        select: { amount: true, currency: true },
+        select: { amount: true, currency: true, agentId: true }, // ← added agentId
       }),
-      // Merchant settlements pending
       prisma.settlement.findMany({
         where: {
           collectorId,
@@ -72,7 +68,6 @@ router.get("/dashboard", async (req, res) => {
         },
         select: { amount: true, currency: true },
       }),
-      // Merchant settlements confirmed (for cards)
       prisma.settlement.findMany({
         where: {
           collectorId,
@@ -81,7 +76,6 @@ router.get("/dashboard", async (req, res) => {
         },
         select: { amount: true, currency: true },
       }),
-      // Agent settlements pending
       prisma.settlement.findMany({
         where: {
           collectorId,
@@ -90,7 +84,6 @@ router.get("/dashboard", async (req, res) => {
         },
         select: { amount: true, currency: true },
       }),
-      // Agent settlements confirmed (for cards)
       prisma.settlement.findMany({
         where: {
           collectorId,
@@ -98,20 +91,52 @@ router.get("/dashboard", async (req, res) => {
           status: { in: ["CONFIRMED", "PAID"] },
         },
         select: { amount: true, currency: true },
+      }),
+      prisma.rateConfig.findMany({
+        where: { merchantId: { not: null }, adminId },
+        select: { merchantId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.rateConfig.findMany({
+        where: { agentId: { not: null }, adminId },
+        select: { agentId: true, aedTodayRate: true, usdtTodayRate: true },
+        orderBy: { updatedAt: "desc" },
       }),
     ]);
 
+    // ✅ Build per-entity rate maps
+    const merchantRateMap = {};
+    allMerchantRates.forEach((r) => {
+      if (!merchantRateMap[r.merchantId]) merchantRateMap[r.merchantId] = r;
+    });
+    const agentRateMap = {};
+    allAgentRates.forEach((r) => {
+      if (!agentRateMap[r.agentId]) agentRateMap[r.agentId] = r;
+    });
+
+    // ✅ Fallback global rate
     const rateConfig = await prisma.rateConfig.findFirst({
+      where: { adminId },
       orderBy: { updatedAt: "desc" },
     });
     const aedRate = parseFloat(rateConfig?.aedTodayRate || 1);
     const usdtRate = parseFloat(rateConfig?.usdtTodayRate || 1);
 
-    const calcInr = (list) =>
-      list.reduce((sum, s) => {
-        const amt = parseFloat(s.amount || 0);
-        return sum + (s.currency === "USDT" ? amt * usdtRate : amt * aedRate);
-      }, 0);
+    // ✅ Per-merchant rate for settlements
+    const merchantSettledInr = merchantSettledList.reduce((sum, s) => {
+      const rate = parseFloat(merchantRateMap[s.merchantId]?.aedTodayRate || aedRate);
+      const uRate = parseFloat(merchantRateMap[s.merchantId]?.usdtTodayRate || usdtRate);
+      const amt = parseFloat(s.amount || 0);
+      return sum + (s.currency === "USDT" ? amt * uRate : amt * rate);
+    }, 0);
+
+    // ✅ Per-agent rate for settlements
+    const agentSettledInr = agentSettledList.reduce((sum, s) => {
+      const rate = parseFloat(agentRateMap[s.agentId]?.aedTodayRate || aedRate);
+      const uRate = parseFloat(agentRateMap[s.agentId]?.usdtTodayRate || usdtRate);
+      const amt = parseFloat(s.amount || 0);
+      return sum + (s.currency === "USDT" ? amt * uRate : amt * rate);
+    }, 0);
 
     const sumByCurrency = (list) => ({
       aed: list
@@ -123,18 +148,10 @@ router.get("/dashboard", async (req, res) => {
     });
 
     const totalCleared = parseFloat(clearedAgg._sum.amount || 0);
-    const totalAgentCommission = parseFloat(
-      agentCommAgg._sum.agentCommission || 0,
-    );
+    const totalAgentCommission = parseFloat(agentCommAgg._sum.agentCommission || 0);
 
-    const merchantSettledInr = calcInr(merchantSettledList);
-    const agentSettledInr = calcInr(agentSettledList);
-
-    // Pending lena = total cleared - confirmed settlements
     const totalMerchantLena = totalCleared - merchantSettledInr;
-    // Pending dena = total cleared - agent commission - confirmed settlements
-    const totalAgentDena =
-      totalCleared - totalAgentCommission - agentSettledInr;
+    const totalAgentDena = totalCleared - totalAgentCommission - agentSettledInr;
 
     res.json({
       success: true,
@@ -148,12 +165,11 @@ router.get("/dashboard", async (req, res) => {
         merchantConfirmed: sumByCurrency(merchantConfirmed),
         agentPending: sumByCurrency(agentPending),
         agentConfirmed: sumByCurrency(agentConfirmed),
-        totalAdminCommission: parseFloat(
-          adminCommAgg._sum.adminCommission || 0,
-        ),
+        totalAdminCommission: parseFloat(adminCommAgg._sum.adminCommission || 0),
       },
     });
   } catch (error) {
+    console.error("Collector dashboard error:", error);
     res.status(500).json({ success: false, message: "Server error." });
   }
 });

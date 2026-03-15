@@ -1111,6 +1111,17 @@ export function AdminTransactions() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this pending transaction?")) return;
+    try {
+      await api.delete(`/admin/transactions/${id}`);
+      toast.success("Deleted!");
+      fetchTransactions();
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Cannot delete.");
+    }
+  };
+
   const columns = [
     { header: "ID", key: "id" },
     {
@@ -1165,12 +1176,22 @@ export function AdminTransactions() {
           </div>
         }
         actions={(row) => (
-          <button
-            onClick={() => setShowDetail(row)}
-            className="text-brand-500 text-sm hover:underline"
-          >
-            View All
-          </button>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setShowDetail(row)}
+              className="text-brand-500 text-sm hover:underline"
+            >
+              View All
+            </button>
+            {row.status === "PENDING" && (
+              <button
+                onClick={() => handleDelete(row.id)}
+                className="text-red-500 text-sm hover:underline"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         )}
       />
 
