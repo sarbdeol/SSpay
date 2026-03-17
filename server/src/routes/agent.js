@@ -190,21 +190,9 @@ router.post("/operators", async (req, res) => {
       !name ||
       !maxTransactionAmount ||
       !minTransactionAmount ||
-      !commissionChargePercent
+      commissionChargePercent === undefined
     )
       return res.status(400).json({ success: false, message: "Required." });
-    const agent = await prisma.agent.findUnique({
-      where: { id: req.user.agentId },
-    });
-    if (
-      parseFloat(commissionChargePercent) <=
-      parseFloat(agent.commissionChargePercent)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).`,
-      });
-    }
     const op = await prisma.operator.create({
       data: {
         name,
@@ -243,21 +231,8 @@ router.put("/operators/:id", async (req, res) => {
       data.maxTransactionAmount = parseFloat(maxTransactionAmount);
     if (minTransactionAmount !== undefined)
       data.minTransactionAmount = parseFloat(minTransactionAmount);
-    if (commissionChargePercent !== undefined) {
-      const agent = await prisma.agent.findUnique({
-        where: { id: req.user.agentId },
-      });
-      if (
-        parseFloat(commissionChargePercent) <=
-        parseFloat(agent.commissionChargePercent)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `Operator commission must be greater than agent commission (${agent.commissionChargePercent}%).`,
-        });
-      }
+    if (commissionChargePercent !== undefined)
       data.commissionChargePercent = parseFloat(commissionChargePercent);
-    }
     if (description !== undefined) data.description = description;
     if (typeof isActive === "boolean") data.isActive = isActive;
     await prisma.operator.update({ where: { id }, data });
