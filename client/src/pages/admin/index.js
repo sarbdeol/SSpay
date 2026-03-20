@@ -2051,7 +2051,7 @@ export function AdminTrialBalance() {
                   {i < credit.length
                     ? fmt(toAed(credit[i].pending, credit[i].aedRate))
                     : i === credit.length
-                      ? fmt(toAed(adminComm, fallbackRate))
+                      ? fmt(data?.totalAdminCommissionAed || 0)
                       : ""}
                 </td>
                 <td className="border border-gray-200 px-2 py-1.5 text-gray-800">
@@ -2098,7 +2098,7 @@ export function AdminTrialBalance() {
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Admin Commission (INR)</div>
           <div className="font-bold text-purple-700">₹{fmt(adminComm)}</div>
-          <div className="text-xs text-purple-500 mt-0.5">AED {fmt(toAed(adminComm, fallbackRate))}</div>
+          <div className="text-xs text-purple-500 mt-0.5">AED {fmt(data?.totalAdminCommissionAed || 0)}</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <div className="text-gray-500 text-xs">Total Dena + Commission (INR)</div>
