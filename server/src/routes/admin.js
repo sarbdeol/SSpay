@@ -1033,6 +1033,7 @@ router.get("/trial-balance", async (req, res) => {
 
 // ═══ LEDGER ═══
 // ═══ LEDGER ═══
+// ═══ LEDGER ═══
 router.get("/ledger", async (req, res) => {
   try {
     const adminId = req.user.adminId;
@@ -1056,7 +1057,6 @@ router.get("/ledger", async (req, res) => {
     };
 
     const [
-      // Fetch raw transactions to compute weighted AED per merchant/agent
       clearedTxns,
       merchantSettlements,
       agentSettlements,
@@ -1064,7 +1064,7 @@ router.get("/ledger", async (req, res) => {
       agents,
       adminCommAgg,
     ] = await Promise.all([
-      // Get all cleared transactions with stored rates
+      // Fetch all cleared transactions with stored merchant rate
       prisma.transaction.findMany({
         where: txWhere,
         select: {
@@ -1072,8 +1072,7 @@ router.get("/ledger", async (req, res) => {
           agentId: true,
           amount: true,
           agentCommission: true,
-          aedRate: true,
-          usdtRate: true,
+          aedRate: true,   // merchant's rate stored at clear time
         },
       }),
       prisma.settlement.findMany({
@@ -1092,6 +1091,7 @@ router.get("/ledger", async (req, res) => {
         },
         select: { agentId: true, amount: true, currency: true },
       }),
+      // Agent rates from rate_configs (agent's own rate)
       prisma.rateConfig.findMany({
         where: { agentId: { not: null }, adminId },
         orderBy: { updatedAt: "desc" },
@@ -1106,7 +1106,7 @@ router.get("/ledger", async (req, res) => {
       }),
     ]);
 
-    // Build agent rate map (current rate — for settlements conversion)
+    // Agent rate map — agent's own rate from rate_configs
     const agentRateMap = {};
     allAgentRates.forEach((r) => {
       if (!agentRateMap[r.agentId]) agentRateMap[r.agentId] = r;
@@ -1115,13 +1115,11 @@ router.get("/ledger", async (req, res) => {
     const agentNameMap = {};
     agents.forEach((a) => (agentNameMap[a.id] = a.name));
 
-    // ── Build merchant ledger from stored per-transaction aedRate ──
+    // ── Merchant ledger: use stored tx.aedRate (merchant's rate at clear time) ──
     const merchantMap = {};
     clearedTxns.forEach((tx) => {
       const mId = tx.merchantId;
-      if (!merchantMap[mId]) {
-        merchantMap[mId] = { totalINR: 0, totalAED: 0, lastRate: 0 };
-      }
+      if (!merchantMap[mId]) merchantMap[mId] = { totalINR: 0, totalAED: 0, lastRate: 0 };
       const amt = parseFloat(tx.amount || 0);
       const rate = parseFloat(tx.aedRate || 0);
       merchantMap[mId].totalINR += amt;
@@ -1131,28 +1129,17 @@ router.get("/ledger", async (req, res) => {
       }
     });
 
-    // ── Build agent ledger from stored per-transaction aedRate ──
+    // ── Agent ledger: use agent's OWN rate from rate_configs ──
     const agentMap = {};
     clearedTxns.forEach((tx) => {
       if (!tx.agentId) return;
       const aId = tx.agentId;
-      if (!agentMap[aId]) {
-        agentMap[aId] = { totalINR: 0, totalAED: 0, commission: 0, lastRate: 0 };
-      }
-      const amt = parseFloat(tx.amount || 0);
-      const comm = parseFloat(tx.agentCommission || 0);
-      const rate = parseFloat(tx.aedRate || 0);
-      agentMap[aId].totalINR += amt;
-      agentMap[aId].commission += comm;
-      if (rate > 0) {
-        agentMap[aId].totalAED += amt / rate;
-        agentMap[aId].lastRate = rate;
-      }
+      if (!agentMap[aId]) agentMap[aId] = { totalINR: 0, commission: 0 };
+      agentMap[aId].totalINR += parseFloat(tx.amount || 0);
+      agentMap[aId].commission += parseFloat(tx.agentCommission || 0);
     });
 
-    // ── Merchant settled map ──
-    // For settlements we use current agent/merchant rate (settlement is in AED/USDT)
-    // We need a merchant rate for settled conversion — derive from transaction data
+    // Merchant settled map
     const merchantCurrentRateMap = {};
     clearedTxns.forEach((tx) => {
       if (tx.aedRate && !merchantCurrentRateMap[tx.merchantId]) {
@@ -1162,20 +1149,19 @@ router.get("/ledger", async (req, res) => {
 
     const merchantSettledMap = {};
     merchantSettlements.forEach((s) => {
-      // Settled AED stays as AED — we track settled in AED directly
       if (!merchantSettledMap[s.merchantId]) merchantSettledMap[s.merchantId] = { aed: 0, inr: 0 };
       const amt = parseFloat(s.amount || 0);
       const rate = merchantCurrentRateMap[s.merchantId] || 1;
       if (s.currency === "USDT") {
-        // approximate: use rate as-is for USDT
         merchantSettledMap[s.merchantId].inr += amt * rate;
-        merchantSettledMap[s.merchantId].aed += amt; // approximate
+        merchantSettledMap[s.merchantId].aed += amt;
       } else {
         merchantSettledMap[s.merchantId].aed += amt;
         merchantSettledMap[s.merchantId].inr += amt * rate;
       }
     });
 
+    // Agent settled map — use agent's own rate
     const agentSettledMap = {};
     agentSettlements.forEach((s) => {
       if (!agentSettledMap[s.agentId]) agentSettledMap[s.agentId] = { aed: 0, inr: 0 };
@@ -1195,10 +1181,9 @@ router.get("/ledger", async (req, res) => {
       const id = parseInt(mId);
       const data = merchantMap[mId];
       const settled = merchantSettledMap[id] || { aed: 0, inr: 0 };
+      const effectiveRate = data.totalAED > 0 ? data.totalINR / data.totalAED : data.lastRate;
       const pendingAed = data.totalAED - settled.aed;
       const pendingInr = data.totalINR - settled.inr;
-      // effective rate = totalINR / totalAED
-      const effectiveRate = data.totalAED > 0 ? data.totalINR / data.totalAED : data.lastRate;
       return {
         id,
         name: merchantNameMap[id] || "Unknown",
@@ -1212,26 +1197,28 @@ router.get("/ledger", async (req, res) => {
       };
     });
 
-    // ── Build agent ledger rows ──
+    // ── Build agent ledger rows using agent's own rate ──
     const agentLedger = Object.keys(agentMap).map((aId) => {
       const id = parseInt(aId);
       const data = agentMap[id];
+      // Use agent's own rate from rate_configs
+      const aedRate = parseFloat(agentRateMap[id]?.aedTodayRate || 0);
       const netINR = data.totalINR - data.commission;
-      const netAED = data.totalAED - (data.totalAED > 0 ? (data.commission / (data.totalINR / data.totalAED)) : 0);
+      const totalAed = aedRate > 0 ? data.totalINR / aedRate : 0;
+      const netAed = aedRate > 0 ? netINR / aedRate : 0;
       const settled = agentSettledMap[id] || { aed: 0, inr: 0 };
-      const pendingAed = netAED - settled.aed;
+      const pendingAed = netAed - settled.aed;
       const pendingInr = netINR - settled.inr;
-      const effectiveRate = data.totalAED > 0 ? data.totalINR / data.totalAED : data.lastRate;
       return {
         id,
         name: agentNameMap[id] || "Unknown",
         total: netINR,
-        totalAed: netAED,
+        totalAed: netAed,
         settled: settled.inr,
         settledAed: settled.aed,
         pending: pendingInr,
         pendingAed,
-        aedRate: parseFloat(effectiveRate.toFixed(4)),
+        aedRate,
       };
     });
 
