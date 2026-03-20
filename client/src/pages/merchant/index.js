@@ -34,7 +34,6 @@ export function MerchantDashboard() {
   const { aedTodayRate } = rates;
   const toAed = (n) => (aedTodayRate > 0 ? n / aedTodayRate : 0);
 
-
   return (
     <div>
       <PageHeader title="Merchant Dashboard" />
@@ -77,8 +76,17 @@ export function MerchantDashboard() {
           prefix="AED "
           index={0}
         />
-        <StatCard title="Total Settled (AED)" value={stats?.totalSettledAed || 0} prefix="AED " index={1} />
-<StatCard title="Total Settled (INR)" value={stats?.totalSettledInr || 0} index={2} />
+        <StatCard
+          title="Total Settled (AED)"
+          value={stats?.totalSettledAed || 0}
+          prefix="AED "
+          index={1}
+        />
+        <StatCard
+          title="Total Settled (INR)"
+          value={stats?.totalSettledInr || 0}
+          index={2}
+        />
       </div>
 
       <div className="flex flex-wrap gap-4 mb-4">
@@ -112,7 +120,7 @@ export function MerchantDashboard() {
   );
 }
 
-// ─── Transactions (READ ONLY - no create button) ───
+// ─── Transactions (READ ONLY) ───
 export function MerchantTransactions() {
   const [transactions, setTransactions] = useState([]);
   const [total, setTotal] = useState(0);
@@ -249,7 +257,7 @@ export function MerchantTransactions() {
   );
 }
 
-// ─── Sub-Merchants (with copy credentials + impersonate) ───
+// ─── Sub-Merchants ───
 export function MerchantSubmerchants() {
   const [items, setItems] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -459,8 +467,8 @@ export function MerchantSettlements() {
         return "Submitted by Collector";
       case "REJECTED":
         return "Rejected by Collector";
-      case 'CONFIRMED': return 'Confirmed';
-
+      case "CONFIRMED":
+        return "Confirmed";
       default:
         return status;
     }
@@ -474,10 +482,10 @@ export function MerchantSettlements() {
         return "bg-blue-100 text-blue-700";
       case "REJECTED":
         return "bg-red-100 text-red-700";
-      case 'CONFIRMED': return 'bg-teal-100 text-teal-700';
+      case "CONFIRMED":
+        return "bg-teal-100 text-teal-700";
       default:
         return "bg-amber-100 text-amber-700";
-      
     }
   };
 
@@ -585,7 +593,6 @@ export function MerchantConfiguration() {
       setExistingRates(r.data.rates || []);
     });
   };
-
   useEffect(() => {
     fetchRates();
   }, []);
@@ -628,16 +635,22 @@ export function MerchantConfiguration() {
         subtitle="Set AED and USDT rates for sub-merchants"
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Set Rate Form */}
         <div className="bg-white rounded-2xl shadow-card p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-4">Set New Rate</h3>
+          <h3 className="text-base font-semibold text-gray-800 mb-4">
+            Set New Rate
+          </h3>
           <form onSubmit={handleUpdate}>
             <FormSelect
               label="Select Sub-Merchant"
               placeholder="All Sub-Merchants"
-              options={subMerchants.map((s) => ({ value: s.id, label: s.name }))}
+              options={subMerchants.map((s) => ({
+                value: s.id,
+                label: s.name,
+              }))}
               value={form.subMerchantId}
-              onChange={(e) => setForm({ ...form, subMerchantId: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, subMerchantId: e.target.value })
+              }
             />
             <FormInput
               label="USDT Today Rate"
@@ -645,7 +658,9 @@ export function MerchantConfiguration() {
               type="number"
               step="0.0001"
               value={form.usdtTodayRate}
-              onChange={(e) => setForm({ ...form, usdtTodayRate: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, usdtTodayRate: e.target.value })
+              }
               placeholder="e.g. 92"
             />
             <FormInput
@@ -654,66 +669,109 @@ export function MerchantConfiguration() {
               type="number"
               step="0.0001"
               value={form.aedTodayRate}
-              onChange={(e) => setForm({ ...form, aedTodayRate: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, aedTodayRate: e.target.value })
+              }
               placeholder="e.g. 26.05"
             />
-            <Button type="submit" className="w-full">Update Rate</Button>
+            <Button type="submit" className="w-full">
+              Update Rate
+            </Button>
           </form>
         </div>
-
-        {/* Current Rates */}
         <div className="bg-white rounded-2xl shadow-card p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-4">Current Rates</h3>
+          <h3 className="text-base font-semibold text-gray-800 mb-4">
+            Current Rates
+          </h3>
           {existingRates.length === 0 ? (
             <p className="text-sm text-gray-400">No rates configured yet.</p>
           ) : (
             <div className="space-y-3">
               {existingRates.map((rate) => (
-                <div key={rate.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-mac">
+                <div
+                  key={rate.id}
+                  className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-mac"
+                >
                   <div>
                     <p className="text-sm font-semibold text-gray-800">
-                      {rate.merchantId && !rate.agentId ? "All Sub-Merchants (Global)" : ""}
-                      {rate.agentId ? `Sub-Merchant: ${getSubMerchantName(rate.agentId)}` : ""}
+                      {rate.merchantId && !rate.agentId
+                        ? "All Sub-Merchants (Global)"
+                        : ""}
+                      {rate.agentId
+                        ? `Sub-Merchant: ${getSubMerchantName(rate.agentId)}`
+                        : ""}
                     </p>
                     <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                      <span>AED: <strong className="text-green-600">{parseFloat(rate.aedTodayRate).toFixed(4)}</strong></span>
-                      <span>USDT: <strong className="text-blue-600">{parseFloat(rate.usdtTodayRate).toFixed(4)}</strong></span>
-                      <span>Updated: {new Date(rate.updatedAt).toLocaleString()}</span>
+                      <span>
+                        AED:{" "}
+                        <strong className="text-green-600">
+                          {parseFloat(rate.aedTodayRate).toFixed(4)}
+                        </strong>
+                      </span>
+                      <span>
+                        USDT:{" "}
+                        <strong className="text-blue-600">
+                          {parseFloat(rate.usdtTodayRate).toFixed(4)}
+                        </strong>
+                      </span>
+                      <span>
+                        Updated: {new Date(rate.updatedAt).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => setEditRate({
-                      ...rate,
-                      aedTodayRate: parseFloat(rate.aedTodayRate),
-                      usdtTodayRate: parseFloat(rate.usdtTodayRate),
-                    })}
+                    onClick={() =>
+                      setEditRate({
+                        ...rate,
+                        aedTodayRate: parseFloat(rate.aedTodayRate),
+                        usdtTodayRate: parseFloat(rate.usdtTodayRate),
+                      })
+                    }
                     className="p-1.5 rounded-lg hover:bg-gray-100 text-sm transition-mac"
-                  >✏️</button>
+                  >
+                    ✏️
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
-
-      {/* Edit Modal */}
-      <Modal open={!!editRate} onClose={() => setEditRate(null)} title="Edit Rate">
+      <Modal
+        open={!!editRate}
+        onClose={() => setEditRate(null)}
+        title="Edit Rate"
+      >
         {editRate && (
           <form onSubmit={handleEdit}>
             <p className="text-sm text-gray-500 mb-4">
-              {editRate.agentId ? `Sub-Merchant: ${getSubMerchantName(editRate.agentId)}` : "All Sub-Merchants (Global)"}
+              {editRate.agentId
+                ? `Sub-Merchant: ${getSubMerchantName(editRate.agentId)}`
+                : "All Sub-Merchants (Global)"}
             </p>
             <FormInput
-              label="AED Today Rate" required type="number" step="0.0001"
+              label="AED Today Rate"
+              required
+              type="number"
+              step="0.0001"
               value={editRate.aedTodayRate}
-              onChange={(e) => setEditRate({ ...editRate, aedTodayRate: e.target.value })}
+              onChange={(e) =>
+                setEditRate({ ...editRate, aedTodayRate: e.target.value })
+              }
             />
             <FormInput
-              label="USDT Today Rate" required type="number" step="0.0001"
+              label="USDT Today Rate"
+              required
+              type="number"
+              step="0.0001"
               value={editRate.usdtTodayRate}
-              onChange={(e) => setEditRate({ ...editRate, usdtTodayRate: e.target.value })}
+              onChange={(e) =>
+                setEditRate({ ...editRate, usdtTodayRate: e.target.value })
+              }
             />
-            <Button type="submit" className="w-full">Save Changes</Button>
+            <Button type="submit" className="w-full">
+              Save Changes
+            </Button>
           </form>
         )}
       </Modal>
@@ -721,51 +779,52 @@ export function MerchantConfiguration() {
   );
 }
 
+// ─── Merchant Ledger — uses per-transaction stored aedRate/usdtRate ───
 export function MerchantLedger() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const today = new Date().toISOString().split("T")[0];
   const [selectedDate, setSelectedDate] = useState(today);
 
-  const [rates, setRates] = useState({ aedTodayRate: 1, usdtTodayRate: 1 });
-
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.get("/merchant/ledger", {
+    api
+      .get("/merchant/ledger", {
         params: { startDate: selectedDate, endDate: selectedDate },
-      }),
-      api.get("/config/current-rates"),
-    ])
-      .then(([txRes, rateRes]) => {
-        setTransactions(txRes.data.data || []);
-        const r = rateRes.data.data?.[0];
-        if (r)
-          setRates({
-            aedTodayRate: parseFloat(r.aedTodayRate || 1),
-            usdtTodayRate: parseFloat(r.usdtTodayRate || 1),
-          });
+      })
+      .then((r) => {
+        setTransactions(r.data.data || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [selectedDate]);
 
+  // Group by sub-merchant, carry per-transaction rates
   const groupBySubMerchant = () => {
     const groups = {};
     transactions.forEach((tx) => {
       const name = tx.subMerchant?.name || "Direct";
-      if (!groups[name])
-        groups[name] = { name, totalINR: 0, totalCommission: 0 };
+      if (!groups[name]) {
+        groups[name] = {
+          name,
+          totalINR: 0,
+          totalCommission: 0,
+          aedRate: parseFloat(tx.aedRate || 0),
+          usdtRate: parseFloat(tx.usdtRate || 0),
+        };
+      }
       groups[name].totalINR += parseFloat(tx.amount);
       groups[name].totalCommission += parseFloat(tx.merchantCommission || 0);
+      // Keep the latest rate seen for this group
+      if (tx.aedRate) groups[name].aedRate = parseFloat(tx.aedRate);
+      if (tx.usdtRate) groups[name].usdtRate = parseFloat(tx.usdtRate);
     });
     return groups;
   };
 
   const groups = groupBySubMerchant();
-  const { aedTodayRate, usdtTodayRate } = rates;
-  const toAed = (inr) => (aedTodayRate > 0 ? inr / aedTodayRate : 0);
-  const toUsdt = (inr) => (usdtTodayRate > 0 ? inr / usdtTodayRate : 0);
+
+  // Grand totals
   const grandINR = Object.values(groups).reduce((s, g) => s + g.totalINR, 0);
   const grandCommission = Object.values(groups).reduce(
     (s, g) => s + g.totalCommission,
@@ -773,6 +832,22 @@ export function MerchantLedger() {
   );
   const grandBalance = grandINR - grandCommission;
 
+  // Weighted average rates for grand total row
+  const txWithRate = transactions.filter((t) => t.aedRate);
+  const grandAedRate =
+    txWithRate.length > 0
+      ? txWithRate.reduce((s, t) => s + parseFloat(t.aedRate), 0) /
+        txWithRate.length
+      : 0;
+  const txWithUsdtRate = transactions.filter((t) => t.usdtRate);
+  const grandUsdtRate =
+    txWithUsdtRate.length > 0
+      ? txWithUsdtRate.reduce((s, t) => s + parseFloat(t.usdtRate), 0) /
+        txWithUsdtRate.length
+      : 0;
+
+  const grandBalanceAed = grandAedRate > 0 ? grandBalance / grandAedRate : 0;
+  const grandBalanceUsdt = grandUsdtRate > 0 ? grandBalance / grandUsdtRate : 0;
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
 
@@ -816,6 +891,9 @@ export function MerchantLedger() {
                 SUB MERCHANT
               </th>
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+                RATE
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
                 TOTAL AMOUNT (INR)
               </th>
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
@@ -830,7 +908,7 @@ export function MerchantLedger() {
             {Object.keys(groups).length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="border border-gray-200 px-3 py-6 text-center text-gray-400"
                 >
                   No cleared transactions for this date.
@@ -839,6 +917,10 @@ export function MerchantLedger() {
             ) : (
               Object.values(groups).map((group, idx) => {
                 const balance = group.totalINR - group.totalCommission;
+                const balanceAed =
+                  group.aedRate > 0 ? balance / group.aedRate : 0;
+                const balanceUsdt =
+                  group.usdtRate > 0 ? balance / group.usdtRate : 0;
                 return (
                   <tr
                     key={idx}
@@ -849,6 +931,9 @@ export function MerchantLedger() {
                     </td>
                     <td className="border border-gray-200 px-3 py-2 font-semibold text-gray-800">
                       {group.name.toUpperCase()}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-right text-gray-500 text-xs">
+                      {group.aedRate || "-"}
                     </td>
                     <td className="border border-gray-200 px-3 py-2 text-right font-medium">
                       ₹{fmt(group.totalINR)}
@@ -861,7 +946,7 @@ export function MerchantLedger() {
                         ₹{fmt(balance)}
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        AED {fmt(toAed(balance))} | USDT {fmt(toUsdt(balance))}
+                        AED {fmt(balanceAed)} | USDT {fmt(balanceUsdt)}
                       </div>
                     </td>
                   </tr>
@@ -871,7 +956,7 @@ export function MerchantLedger() {
             <tr className="bg-brand-500 text-white font-bold">
               <td
                 className="border border-gray-300 px-3 py-2 text-center"
-                colSpan={2}
+                colSpan={3}
               >
                 TOTAL
               </td>
@@ -884,8 +969,7 @@ export function MerchantLedger() {
               <td className="border border-gray-300 px-3 py-2 text-right">
                 <div>₹{fmt(grandBalance)}</div>
                 <div className="text-xs font-normal mt-0.5 opacity-90">
-                  AED {fmt(toAed(grandBalance))} | USDT{" "}
-                  {fmt(toUsdt(grandBalance))}
+                  AED {fmt(grandBalanceAed)} | USDT {fmt(grandBalanceUsdt)}
                 </div>
               </td>
             </tr>
@@ -913,13 +997,13 @@ export function MerchantLedger() {
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">In AED:</span>
           <span className="ml-2 font-bold text-green-700">
-            {fmt(toAed(grandBalance))}
+            {fmt(grandBalanceAed)}
           </span>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
           <span className="text-gray-500">In USDT:</span>
           <span className="ml-2 font-bold text-purple-700">
-            {fmt(toUsdt(grandBalance))}
+            {fmt(grandBalanceUsdt)}
           </span>
         </div>
       </div>

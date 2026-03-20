@@ -51,10 +51,12 @@ router.get("/dashboard", async (req, res) => {
     const totalSettledAed = parseFloat(settledAgg._sum.amount || 0);
 
     // Get rate to convert settled AED back to INR
-    const rateConfig = await prisma.rateConfig.findFirst({ where: { merchantId }, orderBy: { updatedAt: 'desc' } });
+    const rateConfig = await prisma.rateConfig.findFirst({
+      where: { merchantId },
+      orderBy: { updatedAt: "desc" },
+    });
     const aedRate = parseFloat(rateConfig?.aedTodayRate || 1);
     const totalSettledInr = totalSettledAed * aedRate;
-
     const totalPaymentDena = totalPayOut - totalCommission - totalSettledInr;
 
     res.json({
@@ -139,7 +141,7 @@ router.post("/submerchants", async (req, res) => {
   }
 });
 
-// ─── Transactions (READ ONLY - no create, only submerchant creates) ───
+// ─── Transactions (READ ONLY) ───
 router.get("/transactions", async (req, res) => {
   try {
     const {
@@ -233,6 +235,7 @@ router.get("/settlements", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+
 router.post("/settlements/:id/confirm", async (req, res) => {
   try {
     const settlement = await prisma.settlement.findUnique({
@@ -257,6 +260,7 @@ router.post("/settlements/:id/confirm", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+
 // ─── Rate Configuration for Sub-Merchants ───
 router.get("/rate-config", async (req, res) => {
   try {
@@ -298,7 +302,6 @@ router.post("/rate-config", async (req, res) => {
         },
       });
     } else {
-      // Need an adminId — get it from merchant
       const merchant = await prisma.merchant.findUnique({
         where: { id: req.user.merchantId },
       });
@@ -317,6 +320,7 @@ router.post("/rate-config", async (req, res) => {
   }
 });
 
+// ─── Ledger — uses stored aedRate/usdtRate per transaction ───
 router.get("/ledger", async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -336,6 +340,8 @@ router.get("/ledger", async (req, res) => {
         notes: true,
         transactionClearTime: true,
         createdAt: true,
+        aedRate: true,
+        usdtRate: true,
         subMerchant: { select: { name: true } },
         operator: { select: { name: true } },
       },
@@ -347,4 +353,5 @@ router.get("/ledger", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
+
 module.exports = router;

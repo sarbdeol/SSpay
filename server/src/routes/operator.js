@@ -89,7 +89,6 @@ router.get("/dashboard", async (req, res) => {
       }
     }
 
-    // ✅ totalPaymentLunga = totalAmount - (amount × commissionPercent / 100)
     const totalAmount = parseFloat(paymentLunga._sum.amount || 0);
     const commissionPercent = parseFloat(
       operator?.commissionChargePercent || 0,
@@ -103,8 +102,7 @@ router.get("/dashboard", async (req, res) => {
         totalTransferCount: transferAgg._count || 0,
         totalPendingAmount: pendingAgg._sum.amount || 0,
         totalPendingCount: pendingAgg._count || 0,
-        agentCommissionAmount, // ✅ e.g. 657.505
-
+        agentCommissionAmount,
         totalPaymentLunga,
         totalAedLunga: aedLunga,
         totalUsdtLunga: usdtLunga,
@@ -249,8 +247,17 @@ router.post(
       const amt = parseFloat(tx.amount);
       const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
       const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-      const adC = aC; // admin commission = agent commission
-      const mC = 0; // merchant commission not used
+      const adC = aC;
+      const mC = 0;
+
+      // Fetch rate active for this merchant at clear time
+      const rateAtClear = await prisma.rateConfig.findFirst({
+        where: { merchantId: tx.merchantId, agentId: null },
+        orderBy: { updatedAt: "desc" },
+      });
+      const aedRate = parseFloat(rateAtClear?.aedTodayRate || 0) || null;
+      const usdtRate = parseFloat(rateAtClear?.usdtTodayRate || 0) || null;
+
       await prisma.$transaction(async (pc) => {
         await pc.transaction.update({
           where: { id: txId },
@@ -263,6 +270,8 @@ router.post(
             agentCommission: aC,
             operatorCommission: oC,
             adminCommission: adC > 0 ? adC : 0,
+            aedRate,
+            usdtRate,
           },
         });
         await pc.operator.update({
@@ -278,7 +287,7 @@ router.post(
   },
 );
 
-// ─── Reject with REASON (stored in rejectReason field) ───
+// ─── Reject with REASON ───
 router.post("/transactions/:id/reject", async (req, res) => {
   try {
     const tx = await prisma.transaction.findFirst({
@@ -300,7 +309,6 @@ router.post("/transactions/:id/reject", async (req, res) => {
           transactionClearTime: new Date(),
         },
       });
-      // Restore merchant limit — rejected amount should NOT be counted
       await pc.merchant.update({
         where: { id: tx.merchantId },
         data: { usedLimit: { decrement: parseFloat(tx.amount) } },
@@ -378,7 +386,7 @@ router.post("/transactions/bulk-pick", async (req, res) => {
   }
 });
 
-// ─── Export Picked (for bulk payment) ───
+// ─── Export Picked ───
 router.get("/transactions/export-picked", async (req, res) => {
   try {
     const ExcelJS = require("exceljs");
@@ -438,7 +446,7 @@ router.get("/transactions/export-picked", async (req, res) => {
   }
 });
 
-// ─── Bulk Clear (upload Excel with UTR filled) ───
+// ─── Bulk Clear ───
 const bulkUpload = multer({ storage: multer.memoryStorage() });
 router.post(
   "/transactions/bulk-clear",
@@ -493,8 +501,17 @@ router.post(
           (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
         const oC =
           (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
-        const adC = aC; // admin commission = agent commission
-        const mC = 0; // merchant commission not used
+        const adC = aC;
+        const mC = 0;
+
+        // Fetch rate active for this merchant at clear time
+        const rateAtClear = await prisma.rateConfig.findFirst({
+          where: { merchantId: tx.merchantId, agentId: null },
+          orderBy: { updatedAt: "desc" },
+        });
+        const aedRate = parseFloat(rateAtClear?.aedTodayRate || 0) || null;
+        const usdtRate = parseFloat(rateAtClear?.usdtTodayRate || 0) || null;
+
         await prisma.$transaction(async (pc) => {
           await pc.transaction.update({
             where: { id: tx.id },
@@ -506,6 +523,8 @@ router.post(
               agentCommission: aC,
               operatorCommission: oC,
               adminCommission: adC > 0 ? adC : 0,
+              aedRate,
+              usdtRate,
             },
           });
           await pc.operator.update({
@@ -567,7 +586,7 @@ router.get("/ledger", async (req, res) => {
         notes: true,
         transactionClearTime: true,
         createdAt: true,
-        operatorCommission: true,  // ADD THIS
+        operatorCommission: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -577,4 +596,5 @@ router.get("/ledger", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 module.exports = router;
