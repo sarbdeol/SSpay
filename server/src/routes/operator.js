@@ -447,6 +447,7 @@ router.get("/transactions/export-picked", async (req, res) => {
 });
 
 // ─── Bulk Clear ───
+// ─── Bulk Clear — updated to match by accountNumber + amount ───
 const bulkUpload = multer({ storage: multer.memoryStorage() });
 router.post(
   "/transactions/bulk-clear",
@@ -457,59 +458,120 @@ router.post(
         return res
           .status(400)
           .json({ success: false, message: "File required." });
+
       const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(req.file.buffer);
       const sheet = workbook.worksheets[0];
-      let cleared = 0,
-        skipped = 0;
+
+      let cleared = 0, skipped = 0, errors = [];
+
+      // Read header row to detect column positions dynamically
+      const headerRow = sheet.getRow(1);
+      const headers = {};
+      headerRow.eachCell((cell, colIdx) => {
+        if (cell.value) headers[cell.value.toString().trim().toLowerCase()] = colIdx;
+      });
+
+      // Support both SSpay export format (col by index) and XPay export format (col by name)
+      const getCol = (row, name, fallbackIdx) => {
+        const idx = headers[name.toLowerCase()];
+        const val = idx ? row.getCell(idx).value : row.getCell(fallbackIdx).value;
+        return val?.toString()?.trim() || '';
+      };
+
       const rows = [];
       sheet.eachRow((row, idx) => {
-        if (idx === 1) return;
+        if (idx === 1) return; // skip header
+        const idVal          = getCol(row, 'id', 1);
+        const utrNumber      = getCol(row, 'utrnumber', 9);
+        const accountNumber  = getCol(row, 'accountnumber', 5);
+        const amountVal      = getCol(row, 'amount', 2);
+
         rows.push({
-          id: parseInt(row.getCell(1).value),
-          utrNumber: row.getCell(9).value?.toString()?.trim(),
+          idVal,
+          utrNumber,
+          accountNumber,
+          amount: parseFloat(amountVal) || 0,
         });
       });
+
       for (const row of rows) {
-        if (!row.id || !row.utrNumber) {
+        if (!row.utrNumber) {
           skipped++;
           continue;
         }
-        const tx = await prisma.transaction.findFirst({
-          where: {
-            id: row.id,
-            operatorId: req.user.operatorId,
-            status: { in: ["PICKED", "PAID"] },
-          },
-          include: {
-            merchant: { select: { commissionChargePercent: true } },
-            operator: {
-              select: { commissionChargePercent: true, agentId: true },
+
+        let tx = null;
+
+        // Strategy 1: match by SSpay integer id (original format)
+        const numId = parseInt(row.idVal);
+        if (!isNaN(numId) && numId > 0) {
+          tx = await prisma.transaction.findFirst({
+            where: {
+              id: numId,
+              operatorId: req.user.operatorId,
+              status: { in: ["PICKED", "PAID"] },
             },
-          },
-        });
+            include: {
+              merchant: { select: { commissionChargePercent: true } },
+              operator: { select: { commissionChargePercent: true, agentId: true } },
+            },
+          });
+        }
+
+        // Strategy 2: match by accountNumber + amount (XPay export format)
+        if (!tx && row.accountNumber && row.amount > 0) {
+          tx = await prisma.transaction.findFirst({
+            where: {
+              accountNumber: row.accountNumber,
+              amount: row.amount,
+              operatorId: req.user.operatorId,
+              status: { in: ["PICKED", "PAID"] },
+            },
+            include: {
+              merchant: { select: { commissionChargePercent: true } },
+              operator: { select: { commissionChargePercent: true, agentId: true } },
+            },
+          });
+        }
+
+        // Strategy 3: match by accountNumber + amount without operatorId filter
+        // (in case transaction was picked by different operator session)
+        if (!tx && row.accountNumber && row.amount > 0) {
+          tx = await prisma.transaction.findFirst({
+            where: {
+              accountNumber: row.accountNumber,
+              amount: row.amount,
+              status: { in: ["PICKED", "PAID"] },
+            },
+            include: {
+              merchant: { select: { commissionChargePercent: true } },
+              operator: { select: { commissionChargePercent: true, agentId: true } },
+            },
+          });
+        }
+
         if (!tx) {
           skipped++;
+          errors.push(`Row skipped — no matching PICKED/PAID transaction for account: ${row.accountNumber}, amount: ${row.amount}`);
           continue;
         }
+
         const agent = await prisma.agent.findUnique({
           where: { id: tx.operator.agentId },
         });
         const amt = parseFloat(tx.amount);
-        const aC =
-          (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
-        const oC =
-          (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
+        const aC = (amt * parseFloat(agent?.commissionChargePercent || 0)) / 100;
+        const oC = (amt * parseFloat(tx.operator.commissionChargePercent)) / 100;
         const adC = aC;
         const mC = 0;
 
-        // Fetch rate active for this merchant at clear time
         const rateAtClear = await prisma.rateConfig.findFirst({
           where: { merchantId: tx.merchantId, agentId: null },
           orderBy: { updatedAt: "desc" },
         });
-        const aedRate = parseFloat(rateAtClear?.aedTodayRate || 0) || null;
+        const aedRate  = parseFloat(rateAtClear?.aedTodayRate  || 0) || null;
         const usdtRate = parseFloat(rateAtClear?.usdtTodayRate || 0) || null;
 
         await prisma.$transaction(async (pc) => {
@@ -534,9 +596,11 @@ router.post(
         });
         cleared++;
       }
+
       res.json({
         success: true,
         message: `${cleared} cleared, ${skipped} skipped.`,
+        errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error) {
       console.error("Bulk clear:", error);
@@ -544,7 +608,6 @@ router.post(
     }
   },
 );
-
 router.get("/ledger", async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
