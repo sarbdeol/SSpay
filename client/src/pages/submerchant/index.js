@@ -453,9 +453,12 @@ export function SubMerchantTransactions() {
   const [loading, setLoading] = useState(true);
   const [showReceipt, setShowReceipt] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [parsing, setParsing] = useState(false);
   const [remarkFilter, setRemarkFilter] = useState("");
   const [form, setForm] = useState({
-    transactionType: "UPI",
+    transactionType: "BANK_ACCOUNT",
     amount: "",
     upiId: "",
     accountNumber: "",
@@ -484,11 +487,47 @@ export function SubMerchantTransactions() {
       await api.post("/submerchant/transactions", form);
       toast.success("Transaction created!");
       setShowCreate(false);
+      setForm({
+        transactionType: "BANK_ACCOUNT",
+        amount: "",
+        upiId: "",
+        accountNumber: "",
+        ifscCode: "",
+        accountHolderName: "",
+        notes: "",
+      });
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.message || "Error.");
     }
   };
+
+  const handleParsePaste = async () => {
+  if (!pasteText.trim()) return;
+  setParsing(true);
+  try {
+    const r = await api.post("/submerchant/parse-details", { text: pasteText });
+    const parsed = r.data.data;
+
+    setForm({
+      transactionType: parsed.transactionType || "BANK_ACCOUNT",
+      upiId: parsed.upiId || "",
+      accountNumber: parsed.accountNumber || "",
+      ifscCode: parsed.ifscCode || "",
+      accountHolderName: parsed.accountHolderName || "",
+      amount: parsed.amount || "",
+      notes: parsed.notes || "",
+    });
+
+    setShowPaste(false);
+    setPasteText("");
+    setShowCreate(true);
+    toast.success("Details extracted! Please review and save.");
+  } catch (e) {
+    toast.error("Could not parse details. Fill manually.");
+  }
+  setParsing(false);
+};
 
   const handleExport = async () => {
     const r = await api.get("/reports/export/transactions", {
@@ -531,6 +570,7 @@ export function SubMerchantTransactions() {
       toast.error("Download failed.");
     }
   };
+
   return (
     <div>
       <PageHeader
@@ -545,7 +585,7 @@ export function SubMerchantTransactions() {
               Export 📥
             </Button>
             <label className="h-11 px-5 bg-brand-500 text-white text-sm font-semibold rounded-xl inline-flex items-center justify-center cursor-pointer hover:bg-brand-600 transition-mac">
-              Upload 📤{" "}
+              Upload 📤
               <input
                 type="file"
                 accept=".xlsx,.xls"
@@ -555,6 +595,13 @@ export function SubMerchantTransactions() {
             </label>
             <Button onClick={handleExample} variant="outline">
               Example 📄
+            </Button>
+            <Button
+              onClick={() => setShowPaste(true)}
+              variant="outline"
+              className="border-purple-300 text-purple-600 hover:bg-purple-50"
+            >
+              Paste & Fill ✨
             </Button>
             <Button onClick={() => setShowCreate(true)}>Create</Button>
           </div>
@@ -575,10 +622,7 @@ export function SubMerchantTransactions() {
         />
         {remarkFilter && (
           <button
-            onClick={() => {
-              setRemarkFilter("");
-              setPage(1);
-            }}
+            onClick={() => { setRemarkFilter(""); setPage(1); }}
             className="text-sm text-red-400 hover:text-red-600"
           >
             ✕ Clear
@@ -589,30 +633,15 @@ export function SubMerchantTransactions() {
       <DataTable
         columns={[
           { header: "ID", key: "id" },
-          {
-            header: "Account Holder Name",
-            render: (r) => r.accountHolderName || "-",
-          },
+          { header: "Account Holder Name", render: (r) => r.accountHolderName || "-" },
           { header: "Type", key: "transactionType" },
-          {
-            header: "UPI ID / Account No.",
-            render: (r) => r.upiId || r.accountNumber || "-",
-          },
+          { header: "UPI ID / Account No.", render: (r) => r.upiId || r.accountNumber || "-" },
           { header: "IFSC Code", render: (r) => r.ifscCode || "-" },
-          {
-            header: "Amount",
-            render: (r) => `₹${parseFloat(r.amount).toLocaleString()}`,
-          },
+          { header: "Amount", render: (r) => `₹${parseFloat(r.amount).toLocaleString()}` },
           { header: "Remark", render: (r) => r.notes || "-" },
           { header: "UTR", render: (r) => r.utrNumber || "-" },
-          {
-            header: "Created",
-            render: (r) => new Date(r.createdAt).toLocaleString(),
-          },
-          {
-            header: "Status",
-            render: (r) => <StatusBadge status={r.status} />,
-          },
+          { header: "Created", render: (r) => new Date(r.createdAt).toLocaleString() },
+          { header: "Status", render: (r) => <StatusBadge status={r.status} /> },
         ]}
         data={transactions}
         total={total}
@@ -631,7 +660,42 @@ export function SubMerchantTransactions() {
         }
       />
 
-      {/* Create Modal */}
+      {/* ── Paste & Fill Modal ── */}
+      <Modal
+        open={showPaste}
+        onClose={() => { setShowPaste(false); setPasteText(""); }}
+        title="Paste Payment Details ✨"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 leading-relaxed">
+            Paste any format — WhatsApp message, bank details, UPI info. AI will extract all fields automatically.
+          </p>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={`Example:\nName-Habbur Rahiman shaik\nA/n-50100739635852\nIFSC/HDFC0001956\nAmount-27,000`}
+            rows={8}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-brand-500 resize-none font-mono leading-relaxed"
+          />
+          <Button
+            onClick={handleParsePaste}
+            className="w-full"
+            disabled={parsing || !pasteText.trim()}
+          >
+            {parsing ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                Extracting...
+              </span>
+            ) : "Extract & Fill ✨"}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* ── Create Modal ── */}
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
@@ -645,9 +709,7 @@ export function SubMerchantTransactions() {
               { value: "BANK_ACCOUNT", label: "Bank Account" },
             ]}
             value={form.transactionType}
-            onChange={(e) =>
-              setForm({ ...form, transactionType: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, transactionType: e.target.value })}
           />
           {form.transactionType === "UPI" ? (
             <FormInput
@@ -662,9 +724,7 @@ export function SubMerchantTransactions() {
                 label="Account Number"
                 required
                 value={form.accountNumber}
-                onChange={(e) =>
-                  setForm({ ...form, accountNumber: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
               />
               <FormInput
                 label="IFSC Code"
@@ -676,9 +736,7 @@ export function SubMerchantTransactions() {
                 label="Account Holder Name"
                 required
                 value={form.accountHolderName}
-                onChange={(e) =>
-                  setForm({ ...form, accountHolderName: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, accountHolderName: e.target.value })}
               />
             </>
           )}
@@ -689,7 +747,6 @@ export function SubMerchantTransactions() {
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
           />
-          {/* ✅ Remark field */}
           <FormInput
             label="Remark"
             value={form.notes}
@@ -701,6 +758,7 @@ export function SubMerchantTransactions() {
           </Button>
         </form>
       </Modal>
+
       {showReceipt && (
         <ReceiptImageModal
           transaction={showReceipt}

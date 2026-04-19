@@ -326,6 +326,13 @@ router.post("/transactions/:id/reject", async (req, res) => {
 
 router.get("/pending-transactions", async (req, res) => {
   try {
+    const { amount } = req.query;
+    const budget = parseFloat(amount);
+
+    if (!budget || budget <= 0) {
+      return res.json({ success: true, data: [] });
+    }
+
     const op = await prisma.operator.findUnique({
       where: { id: req.user.operatorId },
     });
@@ -334,12 +341,33 @@ router.get("/pending-transactions", async (req, res) => {
       select: { merchantId: true },
     });
     const mIds = ma.map((m) => m.merchantId);
-    const data = await prisma.transaction.findMany({
+
+    // Fetch all pending, smallest amount first, oldest as tiebreaker
+    const all = await prisma.transaction.findMany({
       where: { status: "PENDING", merchantId: { in: mIds } },
-      orderBy: { createdAt: "asc" },
-      take: 20,
+      orderBy: [{ amount: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        amount: true,
+        transactionType: true,
+        createdAt: true,
+        merchantId: true,
+        // NO accountNumber, NO upiId, NO ifscCode, NO accountHolderName
+      },
     });
-    res.json({ success: true, data });
+
+    // Greedy fill within budget
+    let running = 0;
+    const result = [];
+    for (const tx of all) {
+      const txAmt = parseFloat(tx.amount);
+      if (running + txAmt <= budget) {
+        running += txAmt;
+        result.push(tx);
+      }
+    }
+
+    res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error." });
   }

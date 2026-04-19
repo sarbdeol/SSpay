@@ -3,7 +3,9 @@ const prisma = require('../config/database');
 const { auth, roleCheck } = require('../middleware/auth');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
+const Groq = require('groq-sdk');
 const upload = multer({ storage: multer.memoryStorage() });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 router.use(auth, roleCheck('SUB_MERCHANT'));
 
@@ -151,6 +153,40 @@ router.get('/transactions/example', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=transaction_example.xlsx');
     await workbook.xlsx.write(res);
   } catch (error) { res.status(500).json({ success: false, message: 'Server error.' }); }
+});
+router.post('/parse-details', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ success: false, message: 'Text required.' });
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a payment details extractor. Extract payment details from any free-form text and return ONLY a valid JSON object with exactly these fields:
+- transactionType: "UPI" if a UPI ID is present (contains @ symbol), otherwise "BANK_ACCOUNT"
+- upiId: UPI ID string or null
+- accountNumber: bank account number as a string preserving leading zeros or null
+- ifscCode: IFSC code uppercase no dots or spaces or null
+- accountHolderName: person full name or null
+- amount: numeric string without commas or symbols or null
+- notes: ONLY explicit remarks or comments, NOT the amount line, null if no remark exists
+Return ONLY raw JSON, no markdown, no explanation.`,
+        },
+        { role: 'user', content: text },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content || '{}';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Parse error:', error);
+    res.status(500).json({ success: false, message: 'Parse failed.' });
+  }
 });
 
 module.exports = router;

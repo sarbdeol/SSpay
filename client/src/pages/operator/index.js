@@ -428,6 +428,8 @@ export function OperatorTransactions() {
   const [utr, setUtr] = useState("");
   const [proof, setProof] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [budgetInput, setBudgetInput] = useState("");
+  const [pendingLoading, setPendingLoading] = useState(false);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -446,6 +448,8 @@ export function OperatorTransactions() {
       });
       toast.success(r.data.message);
       setSelectedIds([]);
+      setPending([]);
+      setBudgetInput("");
       fetchData();
     } catch (e) {
       toast.error("Error.");
@@ -492,9 +496,25 @@ export function OperatorTransactions() {
       setTotal(r.data.total);
       setLoading(false);
     });
-    api.get("/operator/pending-transactions").then((r) => {
-      setPending(r.data.data);
-    });
+  };
+
+  const fetchPending = async () => {
+    const budget = parseFloat(budgetInput);
+    if (!budget || budget <= 0) {
+      toast.error("Enter a valid amount.");
+      return;
+    }
+    setPendingLoading(true);
+    try {
+      const r = await api.get(`/operator/pending-transactions?amount=${budget}`);
+      setPending(r.data.data || []);
+      if ((r.data.data || []).length === 0) {
+        toast("No transactions available within this budget.", { icon: "ℹ️" });
+      }
+    } catch (e) {
+      toast.error("Failed to fetch.");
+    }
+    setPendingLoading(false);
   };
 
   useEffect(() => {
@@ -505,6 +525,8 @@ export function OperatorTransactions() {
     try {
       await api.post(`/operator/transactions/${id}/pick`);
       toast.success("Transaction picked");
+      // Remove from pending list
+      setPending((prev) => prev.filter((t) => t.id !== id));
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.message || "Error picking transaction");
@@ -555,9 +577,55 @@ export function OperatorTransactions() {
     }
   };
 
+  const pendingTotal = pending.reduce((s, t) => s + parseFloat(t.amount), 0);
+
   return (
     <div>
-      {/* Pending Transactions */}
+      {/* ── Budget Fetch Section ── */}
+      <div className="mb-6 p-4 bg-white border border-gray-200 rounded-2xl shadow-sm">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">
+              Enter Amount Budget (₹)
+            </label>
+            <input
+              type="number"
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && fetchPending()}
+              placeholder="e.g. 100000"
+              className="h-9 px-3 text-sm border border-gray-200 rounded-lg outline-none focus:border-brand-500 w-52"
+            />
+          </div>
+          <Button
+            onClick={fetchPending}
+            variant="primary"
+            className="h-9 px-5 text-sm"
+            disabled={pendingLoading}
+          >
+            {pendingLoading ? "Fetching..." : "Fetch Available"}
+          </Button>
+          {pending.length > 0 && (
+            <div className="flex items-center gap-3 ml-auto text-sm">
+              <span className="text-gray-500">
+                <span className="font-semibold text-gray-800">{pending.length}</span> transactions
+              </span>
+              <span className="text-gray-400">·</span>
+              <span className="text-gray-500">
+                Total: <span className="font-semibold text-brand-600">₹{pendingTotal.toLocaleString()}</span>
+              </span>
+              <button
+                onClick={() => { setPending([]); setSelectedIds([]); }}
+                className="text-xs text-red-400 hover:text-red-600 underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Available Transactions ── */}
       {pending.length > 0 && (
         <div className="mb-6">
           <PageHeader
@@ -583,12 +651,11 @@ export function OperatorTransactions() {
                 render: (r) => `₹${parseFloat(r.amount).toLocaleString()}`,
               },
               { header: "Type", key: "transactionType" },
-              { header: "UPI ID", render: (r) => r.upiId || "-" },
-              { header: "Account", render: (r) => r.accountNumber || "-" },
               {
                 header: "Created",
                 render: (r) => new Date(r.createdAt).toLocaleString(),
               },
+              // ⚠️ No UPI ID, No Account Number — hidden until picked
             ]}
             data={pending}
             total={pending.length}
@@ -620,7 +687,7 @@ export function OperatorTransactions() {
         </div>
       )}
 
-      {/* Transactions List Header */}
+      {/* ── Transactions List ── */}
       <div className="flex items-center justify-between mb-4">
         <PageHeader title="Transactions List" />
         <div className="flex gap-2">
@@ -664,7 +731,7 @@ export function OperatorTransactions() {
                 : "-",
           },
           {
-            header: "Transaction Status",
+            header: "Status",
             render: (r) => <StatusBadge status={r.status} />,
           },
           {
@@ -725,15 +792,13 @@ export function OperatorTransactions() {
         )}
       />
 
-      {/* Receipt Image Modal */}
+      {/* Modals — unchanged */}
       {showReceipt && (
         <ReceiptImageModal
           transaction={showReceipt}
           onClose={() => setShowReceipt(null)}
         />
       )}
-
-      {/* Account Details Modal */}
       {showAccountDetails && (
         <AccountDetailsModal
           transaction={showAccountDetails}
@@ -741,16 +806,10 @@ export function OperatorTransactions() {
         />
       )}
 
-      {/* PAY MODAL */}
-      <Modal
-        open={!!showPay}
-        onClose={() => setShowPay(null)}
-        title="Make Payment"
-      >
+      <Modal open={!!showPay} onClose={() => setShowPay(null)} title="Make Payment">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Transaction #{showPay?.id} — ₹
-            {showPay && parseFloat(showPay.amount).toLocaleString()}
+            Transaction #{showPay?.id} — ₹{showPay && parseFloat(showPay.amount).toLocaleString()}
           </p>
           {showPay?.transactionType === "UPI" && (
             <div className="bg-gray-50 p-4 rounded text-center">
@@ -769,36 +828,20 @@ export function OperatorTransactions() {
           )}
           {showPay?.transactionType === "BANK_ACCOUNT" && (
             <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
-              <p>
-                <b>Bank:</b> {showPay.bankName}
-              </p>
-              <p>
-                <b>Account:</b> {showPay.accountNumber}
-              </p>
-              <p>
-                <b>IFSC:</b> {showPay.ifscCode}
-              </p>
-              <p>
-                <b>Holder:</b> {showPay.accountHolderName}
-              </p>
+              <p><b>Bank:</b> {showPay.bankName}</p>
+              <p><b>Account:</b> {showPay.accountNumber}</p>
+              <p><b>IFSC:</b> {showPay.ifscCode}</p>
+              <p><b>Holder:</b> {showPay.accountHolderName}</p>
             </div>
           )}
-          <Button onClick={handlePay} className="w-full">
-            Mark as Paid
-          </Button>
+          <Button onClick={handlePay} className="w-full">Mark as Paid</Button>
         </div>
       </Modal>
 
-      {/* UTR MODAL */}
-      <Modal
-        open={!!showUtr}
-        onClose={() => setShowUtr(null)}
-        title="Submit Payment"
-      >
+      <Modal open={!!showUtr} onClose={() => setShowUtr(null)} title="Submit Payment">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Transaction #{showUtr?.id} — ₹
-            {showUtr && parseFloat(showUtr.amount).toLocaleString()}
+            Transaction #{showUtr?.id} — ₹{showUtr && parseFloat(showUtr.amount).toLocaleString()}
           </p>
           <FormInput
             label="UTR Number"
@@ -808,9 +851,7 @@ export function OperatorTransactions() {
             placeholder="Enter UTR Number"
           />
           <div>
-            <label className="text-sm text-gray-700">
-              Upload Payment Proof
-            </label>
+            <label className="text-sm text-gray-700">Upload Payment Proof</label>
             <input
               type="file"
               accept="image/*"
@@ -818,9 +859,7 @@ export function OperatorTransactions() {
               className="mt-1 block w-full text-sm"
             />
           </div>
-          <Button onClick={handleClear} className="w-full">
-            Submit Payment
-          </Button>
+          <Button onClick={handleClear} className="w-full">Submit Payment</Button>
         </div>
       </Modal>
     </div>
