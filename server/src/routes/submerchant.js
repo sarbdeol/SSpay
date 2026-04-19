@@ -172,7 +172,7 @@ router.post('/parse-details', async (req, res) => {
 - ifscCode: IFSC code uppercase no dots or spaces or null
 - accountHolderName: person full name or null
 - amount: numeric string without commas or symbols or null
-- notes: ONLY explicit remarks or comments, NOT the amount line, null if no remark exists
+- notes: null always, do not put anything here
 Return ONLY raw JSON, no markdown, no explanation.`,
         },
         { role: 'user', content: text },
